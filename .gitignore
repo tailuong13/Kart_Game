@@ -1,0 +1,13 @@
+# Thư mục Unity không cần thiết
+[Ll]ibrary/
+[Tt]emp/
+[Bb]uild/
+[Bb]in/
+[Ll]og/
+
+# Các file IDE không cần thiết
+.idea/
+.vs/
+.vscode/
+./Assets/CartoonTracksPack1/Track1/Textures/road_normal.png
+./Assets/CartoonTracksPack1/Track1/Textures/road.psd
