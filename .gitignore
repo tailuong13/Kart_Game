@@ -9,6 +9,6 @@
 .idea/
 .vs/
 .vscode/
-./Assets/Track1/Track1/Textures/road_normal.png
-./Assets/Track1/Track1/Textures/road.psd
-./Assets/Track1/Track1/Textures/garages.psd
+Assets/Track1/Track1/Textures/road_normal.png
+Assets/Track1/Track1/Textures/road.psd
+Assets/Track1/Track1/Textures/garages.psd
