@@ -6,15 +6,19 @@ TagManager:
   tags:
   - SpawnPoint
   - SlotMachineUI
+  - MysteryPlaceholder
+  - Banana
+  - Lightning
+  - Missile
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Banana
   - Water
   - UI
-  - 
-  - 
+  - BananaHeld
+  - MysteryBox
   - 
   - 
   - 

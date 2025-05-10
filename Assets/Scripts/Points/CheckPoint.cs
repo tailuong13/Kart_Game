@@ -12,19 +12,28 @@ public class CheckPoint : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             NetworkObject networkObject = other.GetComponent<NetworkObject>();
-            if (networkObject != null)
+            if (networkObject != null && networkObject.IsOwner)
             {
-                _checkPointsSystem.PlayerThroughCheckPoint(this, networkObject);
-            }
-            else
-            {
-                Debug.LogError($"🚨 Player {other.name} không có NetworkObject!");
+                SendCheckpointTriggerServerRpc(_checkPointsSystem.transform.GetSiblingIndex(), networkObject.NetworkObjectId);
             }
         }
     }
     
+    [ServerRpc(RequireOwnership = false)]
+    private void SendCheckpointTriggerServerRpc(int checkPointIndex, ulong networkObjectId)
+    {
+        CheckPoint checkPoint = _checkPointsSystem.GetCheckpointByIndex(checkPointIndex);
+        NetworkObject carNetworkObject = NetworkManager.Singleton.SpawnManager.SpawnedObjects[networkObjectId];
+        
+        if (checkPoint != null && carNetworkObject != null)
+        {
+            _checkPointsSystem.PlayerThroughCheckPoint(checkPoint, carNetworkObject);
+        }
+    }
+
     public void SetCheckPointsSystem(CheckPointsSystem checkPointsSystem)
     {
         this._checkPointsSystem = checkPointsSystem;
+        Debug.Log($"SetCheckPointsSystem cho {name}");
     }
 }

@@ -12,7 +12,9 @@ public class CheckPointsSystem : NetworkBehaviour
     
     private List<CheckPoint> _checkPointsList;
     private List<int> _nextCheckPointIndexList;
-    private Dictionary<NetworkObjectReference, int> _lapCount;
+    private Dictionary<ulong, int> _lapCount;
+    
+    private List<int> _previousCheckpointIndexList;
     
     public static CheckPointsSystem Instance { get; private set; }
 
@@ -25,71 +27,57 @@ public class CheckPointsSystem : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        _checkPointsList = new List<CheckPoint>();
+        foreach(Transform checkPointSingle in transform)
+        {
+            CheckPoint checkPoint = checkPointSingle.GetComponent<CheckPoint>();
+            checkPoint.SetCheckPointsSystem(this);
+            _checkPointsList.Add(checkPoint);
+        }
+        
         if (IsServer)
         {
             Debug.Log("🚀 Server khởi động CheckPointsSystem!");
-            
-            _checkPointsList = new List<CheckPoint>();
-            foreach(Transform checkPointSingle in transform)
-            {
-                CheckPoint checkPoint = checkPointSingle.GetComponent<CheckPoint>();
-                checkPoint.SetCheckPointsSystem(this);
-                _checkPointsList.Add(checkPoint);
-            }
 
             _nextCheckPointIndexList = new List<int>();
-            _lapCount = new Dictionary<
-                NetworkObjectReference, int>();
+            _lapCount = new Dictionary<ulong, int>();
+            _previousCheckpointIndexList = new List<int>();
         }
         else if (IsClient)
         {
             Debug.Log("📡 Client gửi RequestCarListServerRpc");
-            RequestCarListServerRpc();
+
+            _nextCheckPointIndexList = new List<int>();  
+            _lapCount = new Dictionary<ulong, int>();    
+
+            //RequestCarListServerRpc(); (nếu cần tự gọi sau khi spawn)
         }
     }
     
     public void AddPlayerToCheckpointSystem(NetworkObject car)
     {
         if (!IsServer) return;
-    
-        if (car == null)
-        {
-            Debug.LogError("🚨 Thử thêm một xe nhưng NetworkObject bị NULL!");
-            return;
-        }
 
         NetworkObjectReference carRef = car;
-
-        if (carNetworkObjects == null)
-        {
-            carNetworkObjects = new List<NetworkObjectReference>();
-        }
 
         if (!carNetworkObjects.Contains(carRef))
         {
             carNetworkObjects.Add(carRef);
-            Debug.Log($"✅ Thêm xe {car.name} vào hệ thống checkpoint!");
-
             _nextCheckPointIndexList.Add(0);
-            _lapCount[carRef] = 0;
-        
-            Debug.Log($"📡 Trước khi gửi ClientRpc, số lượng xe: {carNetworkObjects.Count}");
+            _lapCount[car.NetworkObjectId] = 0;
+            _previousCheckpointIndexList.Add(-1);
 
-            // Kiểm tra dữ liệu trước khi gửi
-            if (carNetworkObjects.Count > 0)
-            {
-                SyncCarListClientRpc(carNetworkObjects.ToArray());
-            }
-            else
-            {
-                Debug.LogError("🚨 Không thể gửi ClientRpc vì danh sách xe trống!");
-            }
+            Debug.Log("📡 Gửi danh sách xe cho tất cả client sau khi thêm!");
+            SyncCarListClientRpc(carNetworkObjects.ToArray());
         }
     }
     
     [ClientRpc]
     private void SyncCarListClientRpc(NetworkObjectReference[] carList)
     {
+        if (_nextCheckPointIndexList == null) _nextCheckPointIndexList = new List<int>();
+        if (_lapCount == null) _lapCount = new Dictionary<ulong, int>();
+        
         if (carList == null)
         {
             Debug.LogError("🚨 Lỗi: carList nhận được là NULL!");
@@ -112,7 +100,7 @@ public class CheckPointsSystem : NetworkBehaviour
             if (carRef.TryGet(out NetworkObject carNetworkObject))
             {
                 _nextCheckPointIndexList.Add(0);
-                _lapCount[carRef] = 0;
+                _lapCount[carNetworkObject.NetworkObjectId] = 0;
             }
         }
 
@@ -120,7 +108,7 @@ public class CheckPointsSystem : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void RequestCarListServerRpc(ServerRpcParams rpcParams = default)
+    public void RequestCarListServerRpc(ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
 
@@ -138,37 +126,41 @@ public class CheckPointsSystem : NetworkBehaviour
     
     public void PlayerThroughCheckPoint(CheckPoint checkPoint, NetworkObject carNetworkObject)
     {
+        if (!IsServer) return;
+        
+        ulong id = carNetworkObject.NetworkObjectId;
         NetworkObjectReference carRef = carNetworkObject;
-        if (carNetworkObjects == null || !carNetworkObjects.Contains(carRef))
-        {
-            Debug.Log("Trả về");
-            return;
-        }
+
+        if (carNetworkObjects == null || !carNetworkObjects.Contains(carRef)) return;
 
         int carIndex = carNetworkObjects.IndexOf(carRef);
-        int nextCheckPointIndex = _nextCheckPointIndexList[carIndex];
+        int expectedIndex = _nextCheckPointIndexList[carIndex];
+        int currentIndex = _checkPointsList.IndexOf(checkPoint);
 
-        if (_checkPointsList.IndexOf(checkPoint) == nextCheckPointIndex)
+        if (currentIndex == expectedIndex)
         {
-            Debug.Log("✅ Đúng checkpoint");
-            _nextCheckPointIndexList[carIndex] = (nextCheckPointIndex + 1) % _checkPointsList.Count;
-
-            if (_nextCheckPointIndexList[carIndex] == 0)
+            Debug.Log($"✅ Xe {carNetworkObject.name} qua đúng checkpoint {currentIndex}");
+            
+            if (currentIndex == 0 && _previousCheckpointIndexList[carIndex] == _checkPointsList.Count - 1)
             {
-                _lapCount[carRef] += 1;
-                Debug.Log($"🚗 Xe {carNetworkObject.name} hoàn thành vòng {_lapCount[carRef]}");
-                
-                ResetAllPowerUps();
+                _lapCount[id] += 1;
+                Debug.Log($"🏁 Xe {carNetworkObject.name} hoàn thành vòng {_lapCount[id]}");
 
-                if (_lapCount[carRef] >= 2)
+                KartController kart = carNetworkObject.GetComponent<KartController>();
+                if (kart != null)
                 {
-                    Debug.Log($"🏁 Xe {carNetworkObject.name} đã hoàn thành cuộc đua!");
+                    kart.lapCount.Value = _lapCount[id];
                 }
+
+                ResetAllPowerUps();
             }
+            
+            _previousCheckpointIndexList[carIndex] = currentIndex;
+            _nextCheckPointIndexList[carIndex] = (expectedIndex + 1) % _checkPointsList.Count;
         }
         else
         {
-            Debug.Log("❌ Sai checkpoint");
+            Debug.Log($"❌ Xe {carNetworkObject.name} sai checkpoint! Expected: {expectedIndex}, Got: {currentIndex}");
         }
     }
 
@@ -180,5 +172,13 @@ public class CheckPointsSystem : NetworkBehaviour
             powerUp.ResetGroup();
         }
         Debug.Log("🔄 Tất cả PowerUps đã được reset!");
+    }
+    
+    public CheckPoint GetCheckpointByIndex(int index)
+    {
+        if (_checkPointsList != null && index >= 0 && index < _checkPointsList.Count)
+            return _checkPointsList[index];
+    
+        return null;
     }
 }

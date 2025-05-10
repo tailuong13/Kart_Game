@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
-public class MysteryBox : MonoBehaviour
+public class MysteryBox : NetworkBehaviour
 {
     [Header("Rotation Settings")]
     public float rotationSpeed = 100f; 
@@ -29,6 +30,15 @@ public class MysteryBox : MonoBehaviour
         if (powerUpRandom == null)
         {
             powerUpRandom = FindObjectOfType<PowerUpRandom>();
+        }
+        
+        SetupAudio(pickupSound);
+    }
+    
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer && !NetworkObject.IsSpawned)
+        {
         }
     }
     
@@ -59,6 +69,8 @@ public class MysteryBox : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        Debug.Log($"🔥 Trigger by {other.name}, IsServer: {IsServer}");
+        if (!IsServer) return;
         if (!other.CompareTag("Player")) return;
         if (parentGroup == null) return;
 
@@ -70,19 +82,21 @@ public class MysteryBox : MonoBehaviour
             }
             
             audioSource.PlayOneShot(pickupSound);
-            PowerUpRandom powerUp = other.GetComponentInChildren<PowerUpRandom>();
-            if (powerUp != null)
+            KartController kart = other.GetComponent<KartController>();
+            if (kart != null)
             {
-                powerUp.RandomPowerUp();
+                kart.RequestRandomPowerUpClientRpc(new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams
+                    {
+                        TargetClientIds = new[] { kart.OwnerClientId }
+                    }
+                });
             }
-            else
-            {
-                Debug.LogError("❌ Không tìm thấy PowerUpRandom trong player!");
-            }
-
+            
             parentGroup.MarkPlayerReceived(other.transform);
             HandlePlayerCollision();
-            StartCoroutine(DisableAfterSound());
+            StartCoroutine(HideBoxAfterDelay());
         }
         else
         {
@@ -90,16 +104,26 @@ public class MysteryBox : MonoBehaviour
                 Debug.Log($"Player {other.name} đã nhận MysteryBox tại cụm này rồi!");
         }
     }
+    
+    public void SetParentGroup(PowerUp group)
+    {
+        parentGroup = group;
+    }
 
     private void HandlePlayerCollision()
     {
         Debug.Log("Mystery Box effect activated!");
     }
     
-    private IEnumerator DisableAfterSound()
+    private IEnumerator HideBoxAfterDelay()
     {
-        yield return new WaitForSeconds(pickupSound.length); // chờ âm thanh phát xong
-        gameObject.SetActive(false);
+        yield return new WaitForSeconds(pickupSound != null ? pickupSound.length : 0.5f);
+
+        if (IsServer && NetworkObject.IsSpawned)
+        {
+            NetworkObject.Despawn();
+            Debug.Log($"☠️ MysteryBox {name} đã bị ẩn.");
+        }
     }
 
     private void RespawnBox()

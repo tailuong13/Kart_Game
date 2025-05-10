@@ -1,3 +1,6 @@
+// GameManager.cs - Gợi ý các điểm cần thay đổi cho việc spawn nhiều xe client
+
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -5,18 +8,41 @@ using UnityEngine;
 public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance;
-    public GameObject playerPrefab;
-    private List<Transform> spawnPoints = new List<Transform>();
-    private HashSet<ulong> connectedClients = new HashSet<ulong>();
 
-    private void Awake()
+    [System.Serializable]
+    public class PlayerCarOption
+    {
+        public string carId;                     
+        public GameObject prefab;               
+    }
+
+    [Header("Car Prefabs")]
+    public List<PlayerCarOption> carOptions = new();
+
+    private Dictionary<ulong, string> clientCarChoice = new();     
+    private List<Transform> spawnPoints = new();                   
+    private HashSet<ulong> connectedClients = new();
+
+    private void Start()
     {
         if (Instance == null) Instance = this;
-        
-        // Tìm tất cả SpawnPoints trong scene
+
+        foreach (var car in carOptions)
+        {
+            if (!NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(car.prefab))
+            {
+                NetworkManager.Singleton.AddNetworkPrefab(car.prefab);
+            }
+        }
+
         foreach (GameObject obj in GameObject.FindGameObjectsWithTag("SpawnPoint"))
         {
             spawnPoints.Add(obj.transform);
+        }
+        
+        foreach (var car in carOptions)
+        {
+            Debug.Log($"[GameManager] Registering prefab: {car.carId}, null? {car.prefab == null}");
         }
     }
 
@@ -24,24 +50,58 @@ public class GameManager : NetworkBehaviour
     {
         if (IsServer)
         {
-            NetworkManager.Singleton.OnClientConnectedCallback += OnPlayerConnected;
+            NetworkManager.Singleton.SceneManager.OnSceneEvent += OnSceneEvent;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnPlayerDisconnected;
         }
     }
 
-    private void OnPlayerConnected(ulong clientId)
+    private void OnSceneEvent(SceneEvent sceneEvent)
     {
-        if (!IsServer || connectedClients.Contains(clientId)) return;
-        connectedClients.Add(clientId);
-        
-        Debug.Log($"[Server] Player {clientId} connected. Total players: {connectedClients.Count}");
-        SpawnPlayer(clientId);
-    }
+        if (!IsServer) return;
 
+        if (sceneEvent.SceneEventType == SceneEventType.LoadComplete)
+        {
+            ulong clientId = sceneEvent.ClientId;
+
+            Debug.Log($"[Server] Client {clientId} scene ready — spawning player...");
+
+            if (!connectedClients.Contains(clientId))
+            {
+                connectedClients.Add(clientId);
+            }
+
+            SpawnPlayer(clientId);
+        }
+    }
+    
     private void OnPlayerDisconnected(ulong clientId)
     {
         Debug.Log($"[Server] Player {clientId} đã ngắt kết nối!");
         connectedClients.Remove(clientId);
+        clientCarChoice.Remove(clientId);
+    }
+    private void OnPlayerConnected(ulong clientId)
+    {
+        if (!IsServer || connectedClients.Contains(clientId)) return;
+
+        connectedClients.Add(clientId);
+        Debug.Log($"[Server] Client {clientId} connected — scheduling spawn...");
+
+        StartCoroutine(DelayedSpawn(clientId));
+    }
+
+    private IEnumerator DelayedSpawn(ulong clientId)
+    {
+        yield return null;
+        yield return null;
+        yield return null;
+
+        if (!clientCarChoice.ContainsKey(clientId))
+        {
+            string defaultCarId = carOptions.Count > 0 ? carOptions[0].carId : "default";
+            clientCarChoice[clientId] = defaultCarId;
+        }
+        SpawnPlayer(clientId);
     }
 
     private void SpawnPlayer(ulong clientId)
@@ -54,10 +114,34 @@ public class GameManager : NetworkBehaviour
 
         int spawnIndex = (int)(clientId % (ulong)spawnPoints.Count);
         Transform spawnPoint = spawnPoints[spawnIndex];
-        
-        GameObject player = Instantiate(playerPrefab, spawnPoint.position, Quaternion.Euler(0, 90, 0));
-        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId);
 
-        Debug.Log($"✅ [Server] Player {clientId} spawned at {spawnPoint.position}");
+        string carId = clientCarChoice.ContainsKey(clientId) ? clientCarChoice[clientId] : carOptions[0].carId;
+        GameObject prefab = carOptions.Find(opt => opt.carId == carId)?.prefab;
+
+        if (prefab == null)
+        {
+            Debug.LogError($"❌ Không tìm thấy prefab cho carId = {carId}");
+            return;
+        }
+
+        GameObject player = Instantiate(prefab, spawnPoint.position, Quaternion.Euler(0, 90, 0));
+        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId);
+    
+        Debug.Log($"✅ [Server] Spawned {carId} for client {clientId} at {spawnPoint.position}");
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    public void SetClientCarChoiceServerRpc(string carId, ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        if (carOptions.Exists(opt => opt.carId == carId))
+        {
+            clientCarChoice[clientId] = carId;
+        }
+        else
+        {
+            Debug.LogWarning($"⚠️ carId '{carId}' không hợp lệ, dùng mặc định");
+            clientCarChoice[clientId] = carOptions[0].carId;
+        }
     }
 }
