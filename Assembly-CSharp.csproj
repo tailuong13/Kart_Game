@@ -46,20 +46,27 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\Cinemachine\CinemachineFollowTarget.cs" />
+    <Compile Include="Assets\Scripts\GameManager\GameFlowManager.cs" />
     <Compile Include="Assets\Scripts\GameManager\GameManager.cs" />
     <Compile Include="Assets\Scripts\Network\NetworkButtons.cs" />
     <Compile Include="Assets\Scripts\Items\MysteryBoxesSpawner.cs" />
+    <Compile Include="Assets\Scripts\CarSelection\CarSelectionUI.cs" />
+    <Compile Include="Assets\Scripts\UI\CountDownUI.cs" />
+    <Compile Include="Assets\Scripts\GameManager\ClientLoadingUI.cs" />
     <Compile Include="Assets\Scripts\Points\CheckPointsSystem.cs" />
     <Compile Include="Assets\Scripts\WheelCollider\KartController_Backup.cs" />
     <Compile Include="Assets\Scripts\WheelCollider\MotoController.cs" />
     <Compile Include="Assets\Scripts\WheelCollider\KartController.cs" />
+    <Compile Include="Assets\Scripts\GameManager\CarSelectionManager.cs" />
     <Compile Include="Assets\Scripts\Network\NetworkTransform.cs" />
     <Compile Include="Assets\Scripts\Effects\PlayerSpinEffect.cs" />
     <Compile Include="Assets\Scripts\UI\Speedometer.cs" />
+    <Compile Include="Assets\Scripts\UI\MatchMakingUIController.cs" />
     <Compile Include="Assets\Scripts\Items\BananaTrap.cs" />
     <Compile Include="Assets\Scripts\Items\MysteryBox.cs" />
     <Compile Include="Assets\Scripts\Items\PowerUpRandom.cs" />
     <Compile Include="Assets\Scripts\Items\PowerUp.cs" />
+    <Compile Include="Assets\Scripts\GameManager\MatchmakingManager.cs" />
     <Compile Include="Assets\Scripts\Points\CheckPoint.cs" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Overlay.shader" />

@@ -21,6 +21,9 @@ public class PlayerSpinEffect : MonoBehaviour
         isSpinning = true;
         spinTimer = 0f;
         Debug.Log("✅ Bắt đầu Spin bằng Rigidbody");
+        var kart = GetComponent<KartController>();
+        if (kart != null)
+            kart.isBeingSpin = true;
     }
 
     private void FixedUpdate()

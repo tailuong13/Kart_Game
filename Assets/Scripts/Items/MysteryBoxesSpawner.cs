@@ -9,7 +9,7 @@ public class MysteryBoxesSpawner : MonoBehaviour
    [SerializeField] private GameObject powerUpsParent;
    [SerializeField] private GameObject mysteryBoxPrefab;
    
-   private List<GameObject> spawnedPowerUps = new();         // Danh sách các PowerUps đã spawn
+   private List<GameObject> spawnedPowerUps = new();         
 
    private void Start()
    {
@@ -18,7 +18,6 @@ public class MysteryBoxesSpawner : MonoBehaviour
    
    private IEnumerator WaitForNetworkAndSpawn()
    {
-      // Đợi đến khi NetworkManager hoạt động
       while (!NetworkManager.Singleton.IsListening || !NetworkManager.Singleton.IsServer)
          yield return null;
 

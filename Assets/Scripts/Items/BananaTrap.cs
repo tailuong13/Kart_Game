@@ -3,16 +3,23 @@ using UnityEngine;
 
 public class BananaTrap : NetworkBehaviour
 {
-    public ulong creatorClientId;
-
+    public NetworkVariable<ulong> creatorClientId = new NetworkVariable<ulong>(default,
+        NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        Debug.Log($"[BananaTrap.OnNetworkSpawn] creatorClientId = {creatorClientId}");
+    }
+    
     private void OnTriggerEnter(Collider other)
     {
         if (!IsServer) return;
 
-        var netObj = other.GetComponent<NetworkObject>();
+        var netObj = other.GetComponentInParent<NetworkObject>();;
         if (netObj == null || !netObj.IsPlayerObject) return;
         
-        if (netObj.OwnerClientId == creatorClientId)
+        if (netObj.OwnerClientId == creatorClientId.Value)
         {
             Debug.Log("🚫 Chuối bỏ qua chủ nhân.");
             return;
@@ -20,20 +27,34 @@ public class BananaTrap : NetworkBehaviour
 
         Debug.Log("🍌 Chuối va chạm với: " + netObj.name);
         SpinClientRpc(netObj.OwnerClientId);
+        
+        Debug.Log($"🍌 TriggerEnter: {other.name} | NetObjId: {netObj.NetworkObjectId} | ClientId: {netObj.OwnerClientId}");
 
         if (IsSpawned)
             NetworkObject.Despawn();
     }
 
     [ClientRpc]
-    private void SpinClientRpc(ulong clientId)
+    private void SpinClientRpc(ulong targetClientId)
     {
-        if (NetworkManager.Singleton.LocalClientId != clientId) return;
+        if (NetworkManager.Singleton.LocalClientId != targetClientId) return;
 
-        var spin = GetComponentInParent<PlayerSpinEffect>();
-        if (spin != null)
+        Debug.Log("🎯 SpinClientRpc được gọi cho clientId: " + targetClientId);
+
+        var localPlayer = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
+
+        if (localPlayer != null)
         {
-            spin.StartSpinning();
+            var spin = localPlayer.GetComponent<PlayerSpinEffect>();
+            if (spin != null)
+            {
+                Debug.Log("✅ Tìm thấy PlayerSpinEffect, bắt đầu spin");
+                spin.StartSpinning();
+            }
+            else
+            {
+                Debug.LogWarning("❌ Không tìm thấy PlayerSpinEffect!");
+            }
         }
     }
 }

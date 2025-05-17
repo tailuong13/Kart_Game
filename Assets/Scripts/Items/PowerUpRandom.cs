@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using Unity.Netcode;
@@ -19,40 +20,56 @@ public class PowerUpRandom : NetworkBehaviour
     public Transform holdPoint;
     public Transform holdPoint2;
     public Transform holdPoint3;
+    
+    [Header("Nitro Effects")]
+    public ParticleSystem nitroEffectPrefab;
+    public Transform nitroPointLeft;
+    public Transform nitroPointRight;
+
+    [Header("AudioClips")] 
+    private AudioSource audioSource;
+    public AudioClip nitroSound;
+    
+    private NetworkObject shieldInstance;
+    private bool isShieldActive = false;
 
     private NetworkObject heldPowerUp;
+    private NetworkVariable<ulong> heldPowerUpId = new NetworkVariable<ulong>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    public enum PowerUpType {  Banana,Lightning, Missile, Nitro, Oil,  Shield, None }
+    public enum PowerUpType { Banana, Lightning, Missile, Nitro, Oil, Shield, None }
     public PowerUpType currentPowerUp = PowerUpType.None;
 
-    private ulong heldId;
+    public bool isHoldingPowerUp = false;
+    
+    public KartController kartController; 
 
     public override void OnNetworkSpawn()
     {
+        audioSource = GetComponent<AudioSource>();
+        
+        if (kartController == null)
+        {
+            kartController = GetComponentInParent<KartController>();
+        }
         Debug.Log($"[OnNetworkSpawn] isOwner={IsOwner}, isServer={IsServer}");
 
         if ((IsOwner || IsServer) && holdPoint == null)
         {
             holdPoint = transform.Find("HoldPoint1");
-            Debug.Log($"[OnNetworkSpawn] HoldPoint auto-assigned: {holdPoint?.name}");
-        }
-        
-        if ((IsOwner || IsServer) && holdPoint2 == null)
-        {
             holdPoint2 = transform.Find("HoldPoint2");
-            Debug.Log($"[OnNetworkSpawn] HoldPoint auto-assigned: {holdPoint2?.name}");
+            holdPoint3 = transform.Find("HoldPoint3");
         }
         
-        if ((IsOwner || IsServer) && holdPoint3 == null)
-        {
-            holdPoint2 = transform.Find("HoldPoint3");
-            Debug.Log($"[OnNetworkSpawn] HoldPoint auto-assigned: {holdPoint3?.name}");
-        }
+        if (nitroPointLeft == null)
+            nitroPointLeft = transform.Find("NitroPointLeft");
+
+        if (nitroPointRight == null)
+            nitroPointRight = transform.Find("NitroPointRight");
     }
 
     private void Update()
     {
-        if (IsServer && heldPowerUp != null)
+        if (IsServer && heldPowerUp != null && isHoldingPowerUp)
         {
             UpdatePowerUpPosition();
         }
@@ -60,8 +77,14 @@ public class PowerUpRandom : NetworkBehaviour
 
     private void UpdatePowerUpPosition()
     {
-        Transform targetHold = currentPowerUp == PowerUpType.Missile ? holdPoint2 : holdPoint;
-        
+        Transform targetHold = currentPowerUp switch
+        {
+            PowerUpType.Missile => holdPoint2,
+            PowerUpType.Oil => holdPoint2,
+            PowerUpType.Shield => kartController.transform,
+            _ => holdPoint
+        };
+
         heldPowerUp.transform.position = targetHold.position;
         Quaternion rot = Quaternion.Euler(-90f, targetHold.rotation.eulerAngles.y, 0f);
         heldPowerUp.transform.rotation = rot;
@@ -69,44 +92,48 @@ public class PowerUpRandom : NetworkBehaviour
 
     public void RandomPowerUp()
     {
-        int randomIndex = 5; // Random.Range(0, powerUpSprites.Length);
+        int randomIndex = 5; // Replace with Random.Range(0, powerUpSprites.Length) if needed
         powerUpImage.sprite = powerUpSprites[randomIndex];
 
         PowerUpType selected = (PowerUpType)randomIndex;
         currentPowerUp = selected;
-        
-        Debug.Log($"[RandomPowerUp] Selected: {selected}");
 
-        SpawnPowerUpServerRpc(selected);
+        Debug.Log($"[RandomPowerUp] Selected: {selected}");
+        if (selected != PowerUpType.Nitro && selected != PowerUpType.Shield)
+        {
+            SpawnPowerUpServerRpc(selected);
+        }
+    }
+    
+    public void ClearPowerUpUI()
+    {
+        if (powerUpImage != null)
+        {
+            powerUpImage.sprite = null;
+            Debug.Log("[ClearPowerUpUI] ✅ PowerUp UI cleared");
+        }
     }
 
     [ServerRpc]
     private void SpawnPowerUpServerRpc(PowerUpType type)
     {
-        NetworkObject prefab = null;
-        Transform targetHoldPoint = holdPoint;
-
-        switch (type)
+        NetworkObject prefab = type switch
         {
-            case PowerUpType.Banana:
-                prefab = bananaPowerUpPrefab;
-                break;
-            case PowerUpType.Missile:
-                prefab = missilePowerUpPrefab;
-                targetHoldPoint = holdPoint2;
-                break;
-            case PowerUpType.Lightning:
-                prefab = lightningPowerUpPrefab;
-                break;
-            case PowerUpType.Oil:
-                prefab = oilbullterPowerUpPrefab;
-                targetHoldPoint = holdPoint2;
-                break;
-            case PowerUpType.Shield:
-                prefab = shieldPowerUpPrefab;
-                targetHoldPoint = holdPoint3;
-                break;
-        }
+            PowerUpType.Banana => bananaPowerUpPrefab,
+            PowerUpType.Missile => missilePowerUpPrefab,
+            PowerUpType.Lightning => lightningPowerUpPrefab,
+            PowerUpType.Oil => oilbullterPowerUpPrefab,
+            PowerUpType.Shield => shieldPowerUpPrefab,
+            _ => null
+        };
+
+        Transform targetHoldPoint = type switch
+        {
+            PowerUpType.Missile => holdPoint2,
+            PowerUpType.Oil => holdPoint2,
+            PowerUpType.Shield => kartController.transform,
+            _ => holdPoint
+        };
 
         if (prefab == null)
         {
@@ -118,12 +145,10 @@ public class PowerUpRandom : NetworkBehaviour
         var instance = Instantiate(prefab, targetHoldPoint.position, rot);
         instance.SpawnWithOwnership(OwnerClientId);
 
-        Debug.Log($"[SpawnPowerUpServerRpc] Spawn position: {targetHoldPoint.name} at {targetHoldPoint.position}");
-        
         heldPowerUp = instance;
-        heldId = instance.NetworkObjectId;
-
-        Debug.Log($"[SpawnPowerUpServerRpc] Spawned {type} with NetId={heldId}");
+        heldPowerUpId.Value = instance.NetworkObjectId;
+        isHoldingPowerUp = true;
+        currentPowerUp = type;
 
         var rb = instance.GetComponent<Rigidbody>();
         if (rb) rb.isKinematic = true;
@@ -133,8 +158,22 @@ public class PowerUpRandom : NetworkBehaviour
 
         if (type == PowerUpType.Banana)
         {
-            var trap = instance.GetComponent<BananaTrap>();
-            if (trap != null) trap.creatorClientId = OwnerClientId;
+            var trap = instance.GetComponentInChildren<BananaTrap>();
+            if (trap != null)
+                trap.creatorClientId.Value = OwnerClientId;
+            else
+                Debug.LogWarning($"[SpawnPowerUpServerRpc] No BananaTrap found in {type}");
+        }
+        
+        // Gán parent nếu là shield
+        if (type == PowerUpType.Shield)
+        {
+            instance.transform.SetParent(kartController.transform, false);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one * 2.5f;
+
+            StartCoroutine(ShieldDurationCoroutine(instance));
         }
 
         AttachPowerUpClientRpc(instance.NetworkObjectId, (int)type);
@@ -143,99 +182,210 @@ public class PowerUpRandom : NetworkBehaviour
     [ClientRpc]
     private void AttachPowerUpClientRpc(ulong netId, int powerUpType)
     {
-        if (!IsOwner) return;
-
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(netId, out var obj))
         {
+            if (obj.OwnerClientId != NetworkManager.LocalClientId) return;
+
             heldPowerUp = obj;
-            heldId = netId;
+            isHoldingPowerUp = true;
 
-            var col = heldPowerUp.GetComponent<Collider>();
-            if (col) col.enabled = false;
-
-            var rb = heldPowerUp.GetComponent<Rigidbody>();
+            var rb = obj.GetComponent<Rigidbody>();
             if (rb) rb.isKinematic = true;
 
-            Debug.Log($"[AttachPowerUpClientRpc] Attached {((PowerUpType)powerUpType)} with NetId={netId}");
-        }
-        else
-        {
-            Debug.LogWarning($"[AttachPowerUpClientRpc] Could not find object with NetId={netId}");
+            var col = obj.GetComponent<Collider>();
+            if (col) col.enabled = false;
+
+            Debug.Log($"[AttachPowerUpClientRpc] Attached {(PowerUpType)powerUpType} with NetId={netId}");
         }
     }
 
+    #region Banana - Effect
     public void TryDropBanana()
     {
-        if (heldPowerUp == null) return;
+        if (!IsOwner || heldPowerUp == null || currentPowerUp != PowerUpType.Banana) return;
 
-        Debug.Log($"[TryDropBanana] Dropping banana NetId={heldId}");
-
-        heldPowerUp.ChangeOwnership(NetworkManager.ServerClientId);
-
-        Vector3 pos = heldPowerUp.transform.position;
-        Quaternion rot = Quaternion.Euler(-90f, holdPoint.rotation.eulerAngles.y, 0f);
-
-        DropBananaServerRpc(pos, rot, heldId);
-        heldPowerUp = null;
+        Debug.Log($"[TryDropBanana] Request drop NetId={heldPowerUp.NetworkObjectId}");
+        DropBananaRequestServerRpc(); 
     }
 
     [ServerRpc]
-    private void DropBananaServerRpc(Vector3 position, Quaternion rotation, ulong bananaId)
+    private void DropBananaRequestServerRpc(ServerRpcParams rpcParams = default)
     {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        var playerObj = NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject;
+        var script = playerObj.GetComponent<PowerUpRandom>();
+
+        ulong bananaId = script.heldPowerUpId.Value;
+
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(bananaId, out var banana))
         {
-            banana.transform.position = position;
-            banana.transform.rotation = rotation;
+            banana.ChangeOwnership(NetworkManager.ServerClientId);
 
-            var rb = banana.GetComponent<Rigidbody>();
+            Vector3 pos = banana.transform.position + Vector3.up * 0.3f;
+            Quaternion rot = Quaternion.Euler(-90f, script.holdPoint.rotation.eulerAngles.y, 0f);
+
+            banana.transform.position = pos;
+            banana.transform.rotation = rot;
+
+            Rigidbody rb = banana.GetComponentInChildren<Rigidbody>();
             if (rb)
             {
                 rb.isKinematic = false;
                 rb.useGravity = true;
             }
 
-            var col = banana.GetComponent<Collider>();
+            Collider col = banana.GetComponentInChildren<Collider>();
             if (col) col.enabled = true;
 
-            var trap = banana.GetComponent<BananaTrap>();
-            if (trap) trap.enabled = true;
+            EnableBananaColliderClientRpc(banana.NetworkObjectId);
+            
+            script.heldPowerUp = null;
+            script.heldPowerUpId.Value = 0;
+            script.isHoldingPowerUp = false;
+            script.currentPowerUp = PowerUpType.None;
 
-            Debug.Log($"[DropBananaServerRpc] Dropped Banana at {position}");
+            Debug.Log($"[DropBananaRequestServerRpc] Banana dropped by client {clientId}");
         }
         else
         {
-            Debug.LogWarning($"[DropBananaServerRpc] ❌ Không tìm thấy Banana với NetId={bananaId}");
+            Debug.LogWarning($"[DropBananaRequestServerRpc] ❌ Banana not found for NetId={bananaId}");
         }
     }
 
+    [ClientRpc]
+    private void EnableBananaColliderClientRpc(ulong bananaId)
+    {
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(bananaId, out var obj))
+        {
+            var col = obj.GetComponentInChildren<Collider>();
+            if (col) col.enabled = true;
+
+            var rb = obj.GetComponentInChildren<Rigidbody>();
+            if (rb)
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+            }
+
+            var trap = obj.GetComponent<BananaTrap>();
+            if (trap) trap.enabled = true;
+
+            Debug.Log($"[Client] ✅ Banana collider & rigidbody re-enabled for NetId={bananaId}");
+        }
+    }
+    #endregion
+
+    #region Nitro - Effect
+    public void UseNitro()
+    {
+        if (currentPowerUp != PowerUpType.Nitro) return;
+
+        Debug.Log("[UseNitro] ✅ Using Nitro");
+        ClearPowerUpUI();
+        currentPowerUp = PowerUpType.None;
+
+        if (kartController != null && kartController.IsOwner)
+        {
+            kartController.StartCoroutine(StartNitroEffect());
+        }
+        else
+        {
+            Debug.LogWarning("[UseNitro] ❌ KartController not found or not owner");
+        }
+    }
+
+    private IEnumerator StartNitroEffect()
+    {
+        float originalTorque = kartController.motorTorque;
+        kartController.motorTorque *= 2f; // tăng tốc tạm thời
+
+        Debug.Log("[StartNitroEffect] 🔥 Nitro boost started");
+        if (nitroEffectPrefab != null && nitroPointLeft != null && nitroPointRight != null)
+        {
+            var left = Instantiate(nitroEffectPrefab, nitroPointLeft.position, nitroPointLeft.rotation);
+            var right = Instantiate(nitroEffectPrefab, nitroPointRight.position, nitroPointRight.rotation);
+
+            left.transform.parent = nitroPointLeft;
+            right.transform.parent = nitroPointRight;
+
+            left.Play();
+            right.Play();
+            if (audioSource != null && nitroSound != null)
+            {
+                audioSource.PlayOneShot(nitroSound);
+                Debug.Log("[StartNitroEffect] 🔊 Nitro sound played");
+            }
+
+            Destroy(left.gameObject, 3f);
+            Destroy(right.gameObject, 3f);
+        }
+        yield return new WaitForSeconds(3f);
+
+        kartController.motorTorque = originalTorque;
+        Debug.Log("[StartNitroEffect] 🧊 Nitro boost ended");
+    }
+    
+
+    #endregion
+
+    #region Shield - Effect
+    public void UseShield()
+    {
+        if (currentPowerUp != PowerUpType.Shield || isShieldActive) return;
+
+        Debug.Log("[UseShield] 🛡️ Shield activated");
+        ClearPowerUpUI();
+        currentPowerUp = PowerUpType.None;
+
+        if (IsOwner)
+        {
+            SpawnPowerUpServerRpc(PowerUpType.Shield);
+        }
+    }
+    
+    private IEnumerator ShieldDurationCoroutine(NetworkObject shield)
+    {
+        isShieldActive = true;
+        yield return new WaitForSeconds(5f);
+
+        if (shield != null && shield.IsSpawned)
+            shield.Despawn();
+
+        isShieldActive = false;
+        Debug.Log("[Shield] ⏱️ Shield expired");
+    }
+
+    public bool IsShieldActive()
+    {
+        return isShieldActive;
+    }
+    
+    #endregion
     public void UseLightning()
     {
         if (currentPowerUp != PowerUpType.Lightning || heldPowerUp == null) return;
-
-        Debug.Log("[UseLightning] Lightning used & destroyed");
-        DespawnHeldPowerUpServerRpc(heldId);
+        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
         heldPowerUp = null;
         currentPowerUp = PowerUpType.None;
+        heldPowerUpId.Value = 0;
     }
 
     public void FireMissile()
     {
         if (currentPowerUp != PowerUpType.Missile || heldPowerUp == null) return;
-
-        Debug.Log("[FireMissile] Missile fired & destroyed");
-        DespawnHeldPowerUpServerRpc(heldId);
+        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
         heldPowerUp = null;
         currentPowerUp = PowerUpType.None;
+        heldPowerUpId.Value = 0;
     }
-    
+
     public void FireOilBullet()
     {
         if (currentPowerUp != PowerUpType.Oil || heldPowerUp == null) return;
-
-        Debug.Log("[FireMissile] Missile fired & destroyed");
-        DespawnHeldPowerUpServerRpc(heldId);
+        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
         heldPowerUp = null;
         currentPowerUp = PowerUpType.None;
+        heldPowerUpId.Value = 0;
     }
 
     [ServerRpc]
@@ -248,7 +398,7 @@ public class PowerUpRandom : NetworkBehaviour
         }
         else
         {
-            Debug.LogWarning($"[DespawnHeldPowerUpServerRpc] ❌ NetId={powerUpId} không tồn tại");
+            Debug.LogWarning($"[DespawnHeldPowerUpServerRpc] ❌ NetId={powerUpId} not found");
         }
     }
 }

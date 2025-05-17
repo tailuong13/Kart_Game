@@ -22,7 +22,14 @@ public class GameManager : NetworkBehaviour
     private Dictionary<ulong, string> clientCarChoice = new();     
     private List<Transform> spawnPoints = new();                   
     private HashSet<ulong> connectedClients = new();
+    private HashSet<ulong> readyClients = new();
 
+
+    private void Awake()
+    {
+        Debug.Log($"[GameManager] Awake in scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}, hash: {this.GetHashCode()}");
+    }
+    
     private void Start()
     {
         if (Instance == null) Instance = this;
@@ -48,8 +55,13 @@ public class GameManager : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        Debug.Log($"IsServer={NetworkManager.Singleton.IsServer}, IsClient={NetworkManager.Singleton.IsClient}, IsHost={NetworkManager.Singleton.IsHost}, LocalClientId={NetworkManager.Singleton.LocalClientId}");
         if (IsServer)
         {
+            NetworkManager.Singleton.OnClientConnectedCallback += clientId =>
+            {
+                Debug.Log($"[Server] OnClientConnected: {clientId}");
+            };
             NetworkManager.Singleton.SceneManager.OnSceneEvent += OnSceneEvent;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnPlayerDisconnected;
         }
@@ -61,6 +73,17 @@ public class GameManager : NetworkBehaviour
 
         if (sceneEvent.SceneEventType == SceneEventType.LoadComplete)
         {
+            spawnPoints.Clear();
+            foreach (GameObject obj in GameObject.FindGameObjectsWithTag("SpawnPoint"))
+            {
+                spawnPoints.Add(obj.transform);
+            }
+
+            if (spawnPoints.Count == 0)
+            {
+                Debug.LogError("🚨 Không tìm thấy SpawnPoints trong scene!");
+            }
+            
             ulong clientId = sceneEvent.ClientId;
 
             Debug.Log($"[Server] Client {clientId} scene ready — spawning player...");
@@ -69,8 +92,81 @@ public class GameManager : NetworkBehaviour
             {
                 connectedClients.Add(clientId);
             }
+            
+            if (!NetworkManager.Singleton.ConnectedClients.ContainsKey(clientId))
+            {
+                Debug.LogWarning($"❗️Client {clientId} không nằm trong ConnectedClients → BỎ spawn.");
+                return;
+            }
 
             SpawnPlayer(clientId);
+        }
+    }
+    
+    public IEnumerator StartCountdown()
+    {
+        Debug.Log("[Server] Bắt đầu đếm ngược...");
+        yield return new WaitForSeconds(1f);
+
+        Debug.Log("[Server] Gửi countdown đến client...");
+        ShowCountdownClientRpc(); 
+        yield return new WaitForSeconds(4f); 
+
+        Debug.Log("[Server] Cho phép xe chạy...");
+        EnableCarControlClientRpc();
+    }
+    
+    [ClientRpc]
+    public void ShowCountdownClientRpc()
+    {
+        if (IsServer) return;
+        
+        CountDownUI ui = FindObjectOfType<CountDownUI>();
+        if (ui != null)
+        {
+            ui.StartCountdown();
+        }
+        if (ui == null)
+            Debug.LogWarning("[Client] Không tìm thấy CountDownUI");
+    }
+    
+    [ClientRpc]
+    private void EnableCarControlClientRpc()
+    {
+        if (IsServer) return;
+        
+        foreach (var car in FindObjectsOfType<KartController>())
+        {
+            if (car.IsOwner)
+            {
+                Debug.Log($"[Client] Cho phép xe {car.name} chạy");
+                car.canMove = true;
+            }
+        }
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    public void NotifyReadyServerRpc(ServerRpcParams rpcParams = default)
+    {
+        int realClientCount = 0;
+        foreach (var client in NetworkManager.Singleton.ConnectedClients)
+        {
+            if (client.Key != NetworkManager.Singleton.LocalClientId)
+                realClientCount++;
+        }
+        
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        if (!readyClients.Contains(clientId))
+        {
+            readyClients.Add(clientId);
+            Debug.Log($"[Server] Client {clientId} đã load xong Map");
+
+            Debug.Log($"{readyClients.Count}, {realClientCount}");
+            if (readyClients.Count == realClientCount)
+            {
+                Debug.Log("[Server] Tất cả đã sẵn sàng → bắt đầu đếm ngược");
+                StartCoroutine(StartCountdown());
+            }
         }
     }
     

@@ -1,6 +1,7 @@
 using System.Collections;
 using TMPro;
 using Unity.Netcode;
+using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -37,6 +38,8 @@ public class KartController : NetworkBehaviour
     [Header("HUD")]
     [SerializeField] private GameObject canvasHUD;
     public Slider boostBarSlider;
+    
+    public bool canMove = false;
 
     // Local input tracking
     private float inputReleaseTimer;
@@ -53,7 +56,11 @@ public class KartController : NetworkBehaviour
     private float serverSteer = 0f;
     private bool serverBrake = false;
     
+    [Header("Power Up Effect")]
     public PowerUpRandom powerUpRandom;
+
+    public bool isBeingSpin = false;
+    
     
     [Header("Lap Count")]
     public NetworkVariable<int> lapCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -116,11 +123,15 @@ public class KartController : NetworkBehaviour
 
     private void FixedUpdate()
     {
+        if (!IsOwner || !canMove) return;
+        
         if (IsOwner)
         {
             HandleInput();
             UpdateWheelPositions();
         }
+
+        if (isBeingSpin) return;
         
         if (IsServer)
         {
@@ -149,6 +160,7 @@ public class KartController : NetworkBehaviour
             switch (powerUpRandom.currentPowerUp)
             {
                 case PowerUpRandom.PowerUpType.Banana:
+                    Debug.Log("Drop Banana");
                     powerUpRandom.TryDropBanana();
                     break;
                 case PowerUpRandom.PowerUpType.Lightning:
@@ -160,8 +172,17 @@ public class KartController : NetworkBehaviour
                 case PowerUpRandom.PowerUpType.Oil:
                     powerUpRandom.FireOilBullet();
                     break;
+                case PowerUpRandom.PowerUpType.Shield:
+                    Debug.Log("Active Shield");
+                    powerUpRandom.UseShield();
+                    break;
+                case PowerUpRandom.PowerUpType.Nitro:
+                    Debug.Log("Nitro");
+                    powerUpRandom.UseNitro();
+                    break;
                 // ...
             }
+            powerUpRandom.ClearPowerUpUI();
         }
     }
 

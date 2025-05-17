@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PowerUp : MonoBehaviour
 {
-    private HashSet<Transform> playersReceived = new(); // Dùng Transform hoặc NetworkObject nếu muốn multiplayer
+    private HashSet<Transform> playersReceived = new();
     public AudioClip pickupSound;
 
     private void Start()

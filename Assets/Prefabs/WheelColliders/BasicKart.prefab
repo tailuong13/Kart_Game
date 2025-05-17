@@ -1172,7 +1172,7 @@ GameObject:
   - component: {fileID: 3149833211253527688}
   - component: {fileID: 6839523647006001741}
   m_Layer: 5
-  m_Name: Canvas
+  m_Name: HUDCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2644,6 +2644,37 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &4194772577205168712
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7970623768027299510}
+  m_Layer: 0
+  m_Name: NitroPointLeft
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7970623768027299510
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4194772577205168712}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: -0.591, y: 0.248, z: -1.176}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7764350793917220742}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!1 &4543689679084639295
 GameObject:
   m_ObjectHideFlags: 0
@@ -3989,8 +4020,9 @@ GameObject:
   - component: {fileID: 6663529606998517952}
   - component: {fileID: -1200197506778481725}
   - component: {fileID: 1953051318942076236}
+  - component: {fileID: 7851118927148342776}
   m_Layer: 0
-  m_Name: Kart_Player01
+  m_Name: BasicKart
   m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4028,6 +4060,8 @@ Transform:
   - {fileID: 8370462920259118585}
   - {fileID: 8282919606815866286}
   - {fileID: 6986005030798773204}
+  - {fileID: 7970623768027299510}
+  - {fileID: 7864098942174126531}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
 --- !u!54 &8708112669809798555
@@ -4130,6 +4164,7 @@ MonoBehaviour:
   canvasHUD: {fileID: 2160985937718699884}
   boostBarSlider: {fileID: 2643625363850198455}
   powerUpRandom: {fileID: 0}
+  isBeingSpin: 0
   lapCount:
     m_InternalValue: 0
   lapText: {fileID: 4243326407428712893}
@@ -4212,11 +4247,113 @@ MonoBehaviour:
   lightningPowerUpPrefab: {fileID: 5889723356418470901, guid: 6fc125b654a0fd44083291bc0b5a482a, type: 3}
   missilePowerUpPrefab: {fileID: 6847451984276247511, guid: a72abebe553f7c545ad5ea2cc5e2534f, type: 3}
   oilbullterPowerUpPrefab: {fileID: -4409286945928960897, guid: de3921c42986205458d884b7d27c1564, type: 3}
-  shieldPowerUpPrefab: {fileID: -8628167761355703329, guid: 3b08cdc4220e14c4c8eb053b0ce78deb, type: 3}
+  shieldPowerUpPrefab: {fileID: 2493632013777850553, guid: 8423de13421842a4a98f4c1fa84cb985, type: 3}
   holdPoint: {fileID: 8370462920259118585}
   holdPoint2: {fileID: 8282919606815866286}
   holdPoint3: {fileID: 6986005030798773204}
-  currentPowerUp: 0
+  nitroEffectPrefab: {fileID: 3372486963006722333, guid: 227187ca6985d714086688ac7aaf52b3, type: 3}
+  nitroPointLeft: {fileID: 7970623768027299510}
+  nitroPointRight: {fileID: 7864098942174126531}
+  nitroSound: {fileID: 8300000, guid: 193d06adc550b04479221484a050d3a2, type: 3}
+  currentPowerUp: 6
+  isHoldingPowerUp: 0
+  kartController: {fileID: 0}
+--- !u!82 &7851118927148342776
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7498167421185707651}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &7545036898403491508
 GameObject:
   m_ObjectHideFlags: 0
@@ -4540,6 +4677,37 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &8264223924745709541
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7864098942174126531}
+  m_Layer: 0
+  m_Name: NitroPoint Right
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7864098942174126531
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8264223924745709541}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: 0.622, y: 0.248, z: -1.176}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7764350793917220742}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!1 &8582160380115503173
 GameObject:
   m_ObjectHideFlags: 0
@@ -4820,7 +4988,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2825709516777331275, guid: 6e8fb62b361e81f4e8e3f4577465c18e, type: 3}
       propertyPath: m_Name
-      value: Particles
+      value: DriftParticle
+      objectReference: {fileID: 0}
+    - target: {fileID: 2825709516777331275, guid: 6e8fb62b361e81f4e8e3f4577465c18e, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6703395093388538694, guid: 6e8fb62b361e81f4e8e3f4577465c18e, type: 3}
       propertyPath: m_LocalPosition.x
