@@ -29,7 +29,7 @@ public class GameFlowManager : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        Debug.Log($"[OnNetworkSpawn] {(IsServer ? "Server" : "Client")} GameFlowManager loaded in scene {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}");
+        Debug.Log($"[OnNetworkSpawn] {(IsServer ? "Server" : "Client")} GameFlowManager loaded in scene {SceneManager.GetActiveScene().name}");
         Debug.Log($"IsServer={NetworkManager.Singleton.IsServer}, IsClient={NetworkManager.Singleton.IsClient}, IsHost={NetworkManager.Singleton.IsHost}, LocalClientId={NetworkManager.Singleton.LocalClientId}");
     }
     

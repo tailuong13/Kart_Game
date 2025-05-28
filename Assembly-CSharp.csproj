@@ -48,22 +48,33 @@
     <Compile Include="Assets\Scripts\Cinemachine\CinemachineFollowTarget.cs" />
     <Compile Include="Assets\Scripts\GameManager\GameFlowManager.cs" />
     <Compile Include="Assets\Scripts\GameManager\GameManager.cs" />
+    <Compile Include="Assets\Scripts\RoomManagement\RoomData.cs" />
     <Compile Include="Assets\Scripts\Network\NetworkButtons.cs" />
     <Compile Include="Assets\Scripts\Items\MysteryBoxesSpawner.cs" />
     <Compile Include="Assets\Scripts\CarSelection\CarSelectionUI.cs" />
     <Compile Include="Assets\Scripts\UI\CountDownUI.cs" />
+    <Compile Include="Assets\Scripts\UI\LoginUI.cs" />
+    <Compile Include="Assets\Scripts\Character\CharacterIKSetup.cs" />
+    <Compile Include="Assets\Scripts\GameManager\PlayerSession.cs" />
+    <Compile Include="Assets\Scripts\Network\NetworkPlayer.cs" />
     <Compile Include="Assets\Scripts\GameManager\ClientLoadingUI.cs" />
     <Compile Include="Assets\Scripts\Points\CheckPointsSystem.cs" />
     <Compile Include="Assets\Scripts\WheelCollider\KartController_Backup.cs" />
     <Compile Include="Assets\Scripts\WheelCollider\MotoController.cs" />
+    <Compile Include="Assets\Scripts\UI\WelcomePlayerUI.cs" />
     <Compile Include="Assets\Scripts\WheelCollider\KartController.cs" />
+    <Compile Include="Assets\Scripts\UI\MainMenuUI.cs" />
+    <Compile Include="Assets\Scripts\Server\ServerInit.cs" />
+    <Compile Include="Assets\Scripts\RoomManagement\RoomManager.cs" />
     <Compile Include="Assets\Scripts\GameManager\CarSelectionManager.cs" />
+    <Compile Include="Assets\Scripts\UI\LobbyUI.cs" />
     <Compile Include="Assets\Scripts\Network\NetworkTransform.cs" />
     <Compile Include="Assets\Scripts\Effects\PlayerSpinEffect.cs" />
     <Compile Include="Assets\Scripts\UI\Speedometer.cs" />
     <Compile Include="Assets\Scripts\UI\MatchMakingUIController.cs" />
     <Compile Include="Assets\Scripts\Items\BananaTrap.cs" />
     <Compile Include="Assets\Scripts\Items\MysteryBox.cs" />
+    <Compile Include="Assets\Scripts\GameManager\MenuMusicManager.cs" />
     <Compile Include="Assets\Scripts\Items\PowerUpRandom.cs" />
     <Compile Include="Assets\Scripts\Items\PowerUp.cs" />
     <Compile Include="Assets\Scripts\GameManager\MatchmakingManager.cs" />
@@ -744,6 +755,9 @@
     <Reference Include="Unity.Burst.Editor">
       <HintPath>D:\Tailuong\Projects\Unity\Learn\KLTN-Game\Library\ScriptAssemblies\Unity.Burst.Editor.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.Animation.Rigging.Editor">
+      <HintPath>D:\Tailuong\Projects\Unity\Learn\KLTN-Game\Library\ScriptAssemblies\Unity.Animation.Rigging.Editor.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.Multiplayer.Tools.NetworkSolutionInterface">
       <HintPath>D:\Tailuong\Projects\Unity\Learn\KLTN-Game\Library\ScriptAssemblies\Unity.Multiplayer.Tools.NetworkSolutionInterface.dll</HintPath>
     </Reference>
@@ -818,6 +832,9 @@
     </Reference>
     <Reference Include="Unity.VSCode.Editor">
       <HintPath>D:\Tailuong\Projects\Unity\Learn\KLTN-Game\Library\ScriptAssemblies\Unity.VSCode.Editor.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Animation.Rigging">
+      <HintPath>D:\Tailuong\Projects\Unity\Learn\KLTN-Game\Library\ScriptAssemblies\Unity.Animation.Rigging.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Multiplayer.Tools.Editor">
       <HintPath>D:\Tailuong\Projects\Unity\Learn\KLTN-Game\Library\ScriptAssemblies\Unity.Multiplayer.Tools.Editor.dll</HintPath>

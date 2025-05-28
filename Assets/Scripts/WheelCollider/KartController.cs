@@ -5,7 +5,6 @@ using UnityEditor.Rendering;
 using UnityEngine;
 using UnityEngine.UI;
 
-
 public class KartController : NetworkBehaviour
 {
     private Rigidbody rb;
@@ -39,7 +38,7 @@ public class KartController : NetworkBehaviour
     [SerializeField] private GameObject canvasHUD;
     public Slider boostBarSlider;
     
-    public bool canMove = false;
+    // public bool canMove = true;//false
 
     // Local input tracking
     private float inputReleaseTimer;
@@ -74,6 +73,8 @@ public class KartController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         StartCoroutine(SetupRigidbody());
+        
+        Debug.Log($"OnNetworkSpawn: Owner = {IsOwner}, Rigidbody isKinematic = {rb.isKinematic}");
         
         if (powerUpRandom == null)
         {
@@ -115,15 +116,17 @@ public class KartController : NetworkBehaviour
     private IEnumerator SetupRigidbody()
     {
         yield return null;
-        rb.isKinematic = !(IsOwner || IsServer);
+        rb.isKinematic = !IsServer;
         rb.interpolation = (IsOwner || IsServer)
             ? RigidbodyInterpolation.Interpolate
             : RigidbodyInterpolation.None;
+        
+        Debug.Log($"[Rigidbody Setup] isKinematic = {rb.isKinematic}, interpolation = {rb.interpolation}");
     }
 
     private void FixedUpdate()
     {
-        if (!IsOwner || !canMove) return;
+        Debug.Log($"Input Horizontal: {Input.GetAxis("Horizontal")}, Vertical: {Input.GetAxis("Vertical")}");
         
         if (IsOwner)
         {
@@ -265,6 +268,7 @@ public class KartController : NetworkBehaviour
     [ServerRpc]
     private void SendInputToServerRpc(float accel, float steer, bool brake)
     {
+        Debug.Log($"[Server] Received input: accel={accel}, steer={steer}, brake={brake}");
         serverAccel = accel;
         serverSteer = steer;
         serverBrake = brake;
@@ -345,6 +349,7 @@ public class KartController : NetworkBehaviour
     private void ApplyMotorTorque(float accel)
     {
         float torque = Mathf.Abs(accel) > 0.05f ? motorTorque * accel : 0f;
+        Debug.Log($"[Server] ApplyMotorTorque: {torque}");
         rearLeftWheel.motorTorque = torque;
         rearRightWheel.motorTorque = torque;
     }
@@ -365,6 +370,7 @@ public class KartController : NetworkBehaviour
     
     void UpdateWheelPositions()
     {
+        Debug.Log("UpdateWheelPositions called");
         UpdateWheelPosition(frontLeftWheel, frontLeftTransform, -90f);
         UpdateWheelPosition(frontRightWheel, frontRightTransform, 90f);
         UpdateWheelPosition(rearLeftWheel, rearLeftTransform, -90f);
