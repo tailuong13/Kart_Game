@@ -10,6 +10,7 @@ TagManager:
   - Banana
   - Lightning
   - Missile
+  - Environment
   layers:
   - Default
   - TransparentFX

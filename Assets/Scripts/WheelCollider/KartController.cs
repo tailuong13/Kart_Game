@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using TMPro;
 using Unity.Netcode;
@@ -36,9 +37,10 @@ public class KartController : NetworkBehaviour
 
     [Header("HUD")]
     [SerializeField] private GameObject canvasHUD;
+    public RaceProgressUI raceProgressUI;
     public Slider boostBarSlider;
     
-    // public bool canMove = true;//false
+    public bool canMove = true;//false
 
     // Local input tracking
     private float inputReleaseTimer;
@@ -59,7 +61,7 @@ public class KartController : NetworkBehaviour
     public PowerUpRandom powerUpRandom;
 
     public bool isBeingSpin = false;
-    
+    public bool isStunned = false;
     
     [Header("Lap Count")]
     public NetworkVariable<int> lapCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -68,6 +70,11 @@ public class KartController : NetworkBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        if (raceProgressUI == null)
+        {
+            raceProgressUI = GetComponentInChildren<RaceProgressUI>(true);
+        }
+        
     }
 
     public override void OnNetworkSpawn()
@@ -126,7 +133,10 @@ public class KartController : NetworkBehaviour
 
     private void FixedUpdate()
     {
-        Debug.Log($"Input Horizontal: {Input.GetAxis("Horizontal")}, Vertical: {Input.GetAxis("Vertical")}");
+        if (!canMove)
+        {
+            return;
+        }
         
         if (IsOwner)
         {
@@ -156,10 +166,15 @@ public class KartController : NetworkBehaviour
             }
             else isBoosting = false;
         }
-        
-        //PowerUp Active
-        if (Input.GetKeyDown(KeyCode.Alpha1))
+    }
+
+    private void Update()
+    {
+        if (!IsOwner) return;
+
+        if (Input.GetKeyDown(KeyCode.LeftControl))
         {
+            Debug.Log("Request Random Power Up");
             switch (powerUpRandom.currentPowerUp)
             {
                 case PowerUpRandom.PowerUpType.Banana:
@@ -170,7 +185,9 @@ public class KartController : NetworkBehaviour
                     powerUpRandom.UseLightning();
                     break;
                 case PowerUpRandom.PowerUpType.Missile:
-                    powerUpRandom.FireMissile();
+                    Vector3 fireDirection = transform.forward;
+                    powerUpRandom.FireMissile(fireDirection);
+                    Debug.Log("Fire Missile in direction: " + fireDirection);
                     break;
                 case PowerUpRandom.PowerUpType.Oil:
                     powerUpRandom.FireOilBullet();
@@ -183,7 +200,6 @@ public class KartController : NetworkBehaviour
                     Debug.Log("Nitro");
                     powerUpRandom.UseNitro();
                     break;
-                // ...
             }
             powerUpRandom.ClearPowerUpUI();
         }
@@ -268,7 +284,6 @@ public class KartController : NetworkBehaviour
     [ServerRpc]
     private void SendInputToServerRpc(float accel, float steer, bool brake)
     {
-        Debug.Log($"[Server] Received input: accel={accel}, steer={steer}, brake={brake}");
         serverAccel = accel;
         serverSteer = steer;
         serverBrake = brake;
@@ -349,7 +364,6 @@ public class KartController : NetworkBehaviour
     private void ApplyMotorTorque(float accel)
     {
         float torque = Mathf.Abs(accel) > 0.05f ? motorTorque * accel : 0f;
-        Debug.Log($"[Server] ApplyMotorTorque: {torque}");
         rearLeftWheel.motorTorque = torque;
         rearRightWheel.motorTorque = torque;
     }
@@ -395,10 +409,27 @@ public class KartController : NetworkBehaviour
 
     private void UpdateLapText(int val)
     {
+        int totalLaps = CheckPointsSystem.Instance != null ? CheckPointsSystem.Instance.maxLap : 1;
         if (lapText != null)
         {
-            lapText.text = $"Lap: {val}/2";
+            lapText.text = $"Lap: {val}/{totalLaps}";
         }
     }
 
+    [ServerRpc]
+    public void ApplyStunServerRpc(float duration)
+    {
+        StartCoroutine(StunCoroutine(duration));
+    }
+
+    private IEnumerator StunCoroutine(float duration)
+    {
+        isStunned = true;
+        canMove = false;
+        Debug.Log($"😵 Stunned for {duration} seconds");
+        yield return new WaitForSeconds(duration);
+        isStunned = false;
+        canMove = true;
+    }
+    
 }

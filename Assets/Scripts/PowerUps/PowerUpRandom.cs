@@ -30,6 +30,11 @@ public class PowerUpRandom : NetworkBehaviour
     private AudioSource audioSource;
     public AudioClip nitroSound;
     
+    [Header("UI")]
+    public GameObject arrowUI;
+    
+    public float missileSpeed = 15f;
+    
     private NetworkObject shieldInstance;
     private bool isShieldActive = false;
 
@@ -86,13 +91,21 @@ public class PowerUpRandom : NetworkBehaviour
         };
 
         heldPowerUp.transform.position = targetHold.position;
-        Quaternion rot = Quaternion.Euler(-90f, targetHold.rotation.eulerAngles.y, 0f);
+        Quaternion rot = Quaternion.identity;
+        if (currentPowerUp == PowerUpType.Missile)
+        {
+            rot = Quaternion.Euler(-90f, 0f, 0f);
+        }
+        else
+        {
+            rot = Quaternion.Euler(-90f, targetHold.rotation.eulerAngles.y, 0f);
+        }
         heldPowerUp.transform.rotation = rot;
     }
 
     public void RandomPowerUp()
     {
-        int randomIndex = 5; // Replace with Random.Range(0, powerUpSprites.Length) if needed
+        int randomIndex = 2; // Replace with Random.Range(0, powerUpSprites.Length) if needed
         powerUpImage.sprite = powerUpSprites[randomIndex];
 
         PowerUpType selected = (PowerUpType)randomIndex;
@@ -141,7 +154,17 @@ public class PowerUpRandom : NetworkBehaviour
             return;
         }
 
-        Quaternion rot = Quaternion.Euler(-90f, targetHoldPoint.rotation.eulerAngles.y, 0f);
+        Quaternion rot = Quaternion.identity;
+        if(type == PowerUpType.Missile)
+        {
+            rot = Quaternion.Euler(-90f, 0f, 0f);
+            Debug.Log("[SpawnPowerUpServerRpc] Missile rotation set to -90 degrees on X-axis");
+        }
+        else
+        {
+            rot = Quaternion.Euler(-90f, targetHoldPoint.rotation.eulerAngles.y, 0f);
+            Debug.Log($"[SpawnPowerUpServerRpc] Rotation set to -90 degrees on X-axis, Y={targetHoldPoint.rotation.eulerAngles.y}");
+        }
         var instance = Instantiate(prefab, targetHoldPoint.position, rot);
         instance.SpawnWithOwnership(OwnerClientId);
 
@@ -174,6 +197,12 @@ public class PowerUpRandom : NetworkBehaviour
             instance.transform.localScale = Vector3.one * 2.5f;
 
             StartCoroutine(ShieldDurationCoroutine(instance));
+        }
+
+        if (type == PowerUpType.Missile)
+        {
+            //
+            Debug.Log("[SpawnPowerUpServerRpc] ✅ Arrow UI enabled for Missile");
         }
 
         AttachPowerUpClientRpc(instance.NetworkObjectId, (int)type);
@@ -360,7 +389,18 @@ public class PowerUpRandom : NetworkBehaviour
         return isShieldActive;
     }
     
+    public void setDeactiveShield()
+    {
+        isShieldActive = false;
+        if (shieldInstance != null && shieldInstance.IsSpawned)
+        {
+            shieldInstance.Despawn();
+            Debug.Log("[setUnactiveShield] 🛡️ Shield deactivated");
+        }
+    }
+    
     #endregion
+    
     public void UseLightning()
     {
         if (currentPowerUp != PowerUpType.Lightning || heldPowerUp == null) return;
@@ -370,14 +410,80 @@ public class PowerUpRandom : NetworkBehaviour
         heldPowerUpId.Value = 0;
     }
 
-    public void FireMissile()
+    #region Missile
+    
+    // [ClientRpc]
+    // private void EnableArrowUIClientRpc()
+    // {
+    //     arrowUI.SetActive(true);
+    // }
+
+    public void FireMissile(Vector3 fireDirection)
     {
         if (currentPowerUp != PowerUpType.Missile || heldPowerUp == null) return;
-        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
+
+        ulong powerUpId = heldPowerUpId.Value;
+
         heldPowerUp = null;
         currentPowerUp = PowerUpType.None;
-        heldPowerUpId.Value = 0;
+        isHoldingPowerUp = false;
+
+        FireMissileServerRpc(powerUpId, fireDirection);
     }
+    
+    [ServerRpc]
+    private void FireMissileServerRpc(ulong powerUpId, Vector3 fireDirection)
+    {
+        NetworkObject missileObj;
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(powerUpId, out missileObj))
+        {
+            Debug.LogWarning("Missile not found on server!");
+            return;
+        }
+        
+        missileObj.transform.parent = null;
+        isHoldingPowerUp = false;
+
+        Vector3 forwardOffset = transform.forward * 3f;
+        Vector3 rayOrigin = transform.position + forwardOffset + Vector3.up * 5f; 
+
+        float spawnHeightAboveGround = 1.5f;
+
+        Vector3 finalSpawnPos = rayOrigin;
+
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, 10f, LayerMask.GetMask("Ground")))
+        {
+            finalSpawnPos = hit.point + Vector3.up * spawnHeightAboveGround;
+        }
+        else
+        {
+            finalSpawnPos = transform.position + forwardOffset + Vector3.up * spawnHeightAboveGround;
+            Debug.LogWarning("Raycast không trúng terrain - dùng vị trí tạm");
+        }
+
+        fireDirection.y = 0f;
+        Vector3 adjustedDirection = fireDirection.normalized;
+        
+        missileObj.transform.position = finalSpawnPos;
+        missileObj.transform.rotation = Quaternion.LookRotation(adjustedDirection);
+
+        Rigidbody rb = missileObj.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.velocity = adjustedDirection * 15f;
+        }
+
+        MissileController missile = missileObj.GetComponent<MissileController>();
+        if (missile != null)
+        {
+            missile.SetDirection(adjustedDirection);
+        }
+
+        Debug.Log($"🚀 Missile spawned at {finalSpawnPos} | Direction: {adjustedDirection}");
+    }
+
+    #endregion
 
     public void FireOilBullet()
     {

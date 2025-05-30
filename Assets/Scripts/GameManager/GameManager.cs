@@ -67,6 +67,7 @@ public class GameManager : NetworkBehaviour
         {
             Debug.Log($"[GameManager] Registering prefab: {car.carId}, null? {car.prefab == null}");
         }
+        
     }
 
     public override void OnNetworkSpawn()
@@ -267,6 +268,16 @@ public class GameManager : NetworkBehaviour
         }
 
         carNetObj.SpawnAsPlayerObject(clientId);
+        
+        var kart = carNetObj.GetComponent<KartController>();
+        if (kart != null && kart.raceProgressUI != null)
+        {
+            CheckPointsSystem.Instance.RegisterRaceProgressUI(clientId, kart.raceProgressUI);
+        }
+        else
+        {
+            Debug.LogWarning($"⚠️ Không tìm thấy RaceProgressUI trong prefab của Client {clientId}");
+        }
 
         GameObject character = Instantiate(characterPrefab);
 
