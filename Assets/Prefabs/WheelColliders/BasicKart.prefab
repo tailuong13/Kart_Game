@@ -1498,6 +1498,7 @@ RectTransform:
   - {fileID: 8446514458868722611}
   - {fileID: 5771322391977010096}
   - {fileID: 499898769512345684}
+  - {fileID: 7636485644251276350}
   m_Father: {fileID: 7764350793917220742}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1739,6 +1740,81 @@ WheelCollider:
   m_LayerOverridePriority: 0
   m_Enabled: 1
   m_ProvidesContacts: 0
+--- !u!1 &2445142875668543756
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7636485644251276350}
+  - component: {fileID: 1976091712868479497}
+  - component: {fileID: 6135480999099962296}
+  m_Layer: 5
+  m_Name: OilEffectUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &7636485644251276350
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2445142875668543756}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8833894200181855247}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -0.00024414, y: 0}
+  m_SizeDelta: {x: 1920, y: 1080}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &1976091712868479497
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2445142875668543756}
+  m_CullTransparentMesh: 1
+--- !u!114 &6135480999099962296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2445142875668543756}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 95767c64a4f281a40a5e6923856d47d8, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &2457835594568702802
 GameObject:
   m_ObjectHideFlags: 0
@@ -5100,11 +5176,15 @@ MonoBehaviour:
   nitroPointLeft: {fileID: 7970623768027299510}
   nitroPointRight: {fileID: 7864098942174126531}
   nitroSound: {fileID: 8300000, guid: 193d06adc550b04479221484a050d3a2, type: 3}
+  lightningSound: {fileID: 8300000, guid: 0d6f408dc772c874cb082d7060f95f1a, type: 3}
+  oilSound: {fileID: 8300000, guid: d1a4dc8f78e95eb4fbea1cf761e01b50, type: 3}
   arrowUI: {fileID: 0}
   missileSpeed: 15
   currentPowerUp: 6
   isHoldingPowerUp: 0
   kartController: {fileID: 0}
+  checkPointsSystem: {fileID: 0}
+  oilEffectUI: {fileID: 2445142875668543756}
 --- !u!82 &7851118927148342776
 AudioSource:
   m_ObjectHideFlags: 0

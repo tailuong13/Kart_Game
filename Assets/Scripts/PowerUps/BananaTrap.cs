@@ -25,6 +25,13 @@ public class BananaTrap : NetworkBehaviour
             return;
         }
 
+        var powerUpHandler = other.GetComponent<PowerUpRandom>();
+        if (powerUpHandler != null && powerUpHandler.IsShieldActive())
+        {
+            Debug.Log("🛡️ Người chơi có Shield, không gây hiệu ứng Spin.");
+            return;
+        }
+
         Debug.Log("🍌 Chuối va chạm với: " + netObj.name);
         SpinClientRpc(netObj.OwnerClientId);
         

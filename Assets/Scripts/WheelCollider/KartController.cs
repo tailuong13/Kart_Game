@@ -62,6 +62,8 @@ public class KartController : NetworkBehaviour
 
     public bool isBeingSpin = false;
     public bool isStunned = false;
+    [SerializeField] private float speedModifier = 1f;
+
     
     [Header("Lap Count")]
     public NetworkVariable<int> lapCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -133,6 +135,8 @@ public class KartController : NetworkBehaviour
 
     private void FixedUpdate()
     {
+        if (isBeingSpin) return;
+
         if (!canMove)
         {
             return;
@@ -143,8 +147,6 @@ public class KartController : NetworkBehaviour
             HandleInput();
             UpdateWheelPositions();
         }
-
-        if (isBeingSpin) return;
         
         if (IsServer)
         {
@@ -363,7 +365,8 @@ public class KartController : NetworkBehaviour
 
     private void ApplyMotorTorque(float accel)
     {
-        float torque = Mathf.Abs(accel) > 0.05f ? motorTorque * accel : 0f;
+        float adjustedMotorTorque = motorTorque * speedModifier;
+        float torque = Mathf.Abs(accel) > 0.05f ? adjustedMotorTorque * accel : 0f;
         rearLeftWheel.motorTorque = torque;
         rearRightWheel.motorTorque = torque;
     }
@@ -430,6 +433,16 @@ public class KartController : NetworkBehaviour
         yield return new WaitForSeconds(duration);
         isStunned = false;
         canMove = true;
+    }
+    
+    [ServerRpc(RequireOwnership = false)]
+    public void SetSpeedModifierServerRpc(float modifier, ulong targetClientId)
+    {
+        if (OwnerClientId == targetClientId)
+        {
+            speedModifier = modifier;
+            Debug.Log($"Speed modifier của xe {targetClientId} được set thành {modifier}");
+        }
     }
     
 }

@@ -15,8 +15,8 @@ public class CheckPointsSystem : NetworkBehaviour
     [SerializeField]private List<int> _previousCheckpointIndexList;
     [SerializeField]private List<int> _nextCheckPointIndexList;
     private Dictionary<ulong, int> _lapCount;
-    public Dictionary<ulong, PlayerRaceProgress> _raceProgress;
-    private Dictionary<ulong, RaceProgressUI> _raceProgressUIMap = new Dictionary<ulong, RaceProgressUI>();
+    private Dictionary<ulong, PlayerRaceProgress> _playerRaceProgress = new();
+    private Dictionary<ulong, RaceProgressUI> _playerUIMap = new(); 
     public List<ulong> CurrentLeaderboard { get; private set; } = new();
     
     private bool raceFinished = false;
@@ -104,24 +104,24 @@ public class CheckPointsSystem : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        ulong clientId = car.OwnerClientId;
         NetworkObjectReference carRef = car;
 
         if (!carNetworkObjects.Contains(carRef))
         {
             carNetworkObjects.Add(carRef);
             _nextCheckPointIndexList.Add(0);
-            _lapCount[car.NetworkObjectId] = 0;
+            _lapCount[clientId] = 0; // Sử dụng ClientId
             _previousCheckpointIndexList.Add(-1);
             
-            _raceProgress ??= new Dictionary<ulong, PlayerRaceProgress>();
-            _raceProgress[car.NetworkObjectId] = new PlayerRaceProgress
+            _playerRaceProgress[clientId] = new PlayerRaceProgress
             {
                 Lap = 0,
                 CheckpointIndex = 0,
                 TimeStamp = Time.time
             };
             
-            Debug.Log($"RaceProgress count: {_raceProgress?.Count ?? 0}");
+            Debug.Log($"📝 Đăng ký tiến trình cho Client {clientId}");
 
             Debug.Log("📡 Gửi danh sách xe cho tất cả client sau khi thêm!");
             SyncCarListClientRpc(carNetworkObjects.ToArray());
@@ -129,7 +129,7 @@ public class CheckPointsSystem : NetworkBehaviour
             FixedList64Bytes<LeaderboardEntry> lbList = new FixedList64Bytes<LeaderboardEntry>();
             foreach (var id in CurrentLeaderboard)
             {
-                if (_raceProgress.TryGetValue(id, out var progress))
+                if (_playerRaceProgress.TryGetValue(id, out var progress))
                 {
                     lbList.Add(new LeaderboardEntry
                     {
@@ -199,7 +199,7 @@ public class CheckPointsSystem : NetworkBehaviour
     {
         if (!IsServer) return;
         
-        ulong id = carNetworkObject.NetworkObjectId;
+        ulong clientId = carNetworkObject.OwnerClientId;
         NetworkObjectReference carRef = carNetworkObject;
 
         if (carNetworkObjects == null)
@@ -226,51 +226,52 @@ public class CheckPointsSystem : NetworkBehaviour
             
             if (currentIndex == 0 && _previousCheckpointIndexList[carIndex] == _checkPointsList.Count - 1)
             {
-                _lapCount[id] += 1;
-                Debug.Log($"🏁 Xe {carNetworkObject.name} hoàn thành vòng {_lapCount[id]}");
-                if (_raceProgressUIMap.TryGetValue(id, out RaceProgressUI raceProgressUI))
+                _lapCount[clientId] += 1;
+                Debug.Log($"🏁 Xe {carNetworkObject.name} hoàn thành vòng {_lapCount[clientId]}");
+                if (_playerUIMap.TryGetValue(clientId, out RaceProgressUI raceUi))
                 {
-                    raceProgressUI.ResetLapTimerClientRpc();
+                    raceUi.ResetLapTimerClientRpc();
                 }
+
                 else
                 {
-                    Debug.LogWarning($"⚠️ Không tìm thấy RaceProgressUI cho Client {id}");
+                    Debug.LogWarning($"⚠️ Không tìm thấy RaceProgressUI cho Client {clientId}");
                 }
 
                 KartController kart = carNetworkObject.GetComponent<KartController>();
                 if (kart != null)
                 {
-                    kart.lapCount.Value = _lapCount[id];
+                    kart.lapCount.Value = _lapCount[clientId];
                     
                     //finish count
-                    if (!raceFinished && _lapCount[id] >= maxLap)
+                    if (!raceFinished && _lapCount[clientId] >= maxLap)
                     {
                         raceFinished = true;
-                        if (_raceProgressUIMap.TryGetValue(id, out RaceProgressUI progressUI))
+                        if (_playerUIMap.TryGetValue(clientId, out RaceProgressUI ui))
                         {
-                            progressUI.MarkFinishClientRpc();
+                            ui.MarkFinishClientRpc();
                         }
                         else
                         {
-                            Debug.LogWarning($"⚠️ Không tìm thấy RaceProgressUI cho Client {id}");
+                            Debug.LogWarning($"⚠️ Không tìm thấy RaceProgressUI cho Client {clientId}");
                         }
                         countdownTime = 10f;
                         Debug.Log("🏁 Xe đầu tiên hoàn thành! Bắt đầu đếm ngược 10 giây cuối.");
                     }
                 }
-                _raceProgress[id].Lap = _lapCount[id];
+                _playerRaceProgress[clientId].Lap = _lapCount[clientId];
 
                 ResetAllPowerUps();
             }
             
             //leaderBoard
-            _raceProgress[id].CheckpointIndex = currentIndex;
-            _raceProgress[id].TimeStamp = Time.time;
+            _playerRaceProgress[clientId].CheckpointIndex = currentIndex;
+            _playerRaceProgress[clientId].TimeStamp = Time.time;
             UpdateLeaderboard();
             FixedList64Bytes<LeaderboardEntry> lbList = new FixedList64Bytes<LeaderboardEntry>();
             foreach (var playerId in CurrentLeaderboard)
             {
-                if (_raceProgress.TryGetValue(id, out var progress))
+                if (_playerRaceProgress.TryGetValue(playerId, out var progress))
                 {
                     lbList.Add(new LeaderboardEntry
                     {
@@ -321,14 +322,14 @@ public class CheckPointsSystem : NetworkBehaviour
     }
 
     
-    private void UpdateLeaderboard()
+    public void UpdateLeaderboard()
     {
-        CurrentLeaderboard = new List<ulong>(_raceProgress.Keys);
-    
+        CurrentLeaderboard = new List<ulong>(_playerRaceProgress.Keys);
+     
         CurrentLeaderboard.Sort((a, b) =>
         {
-            var pA = _raceProgress[a];
-            var pB = _raceProgress[b];
+            var pA = _playerRaceProgress[a];
+            var pB = _playerRaceProgress[b];
 
             if (pA.Lap != pB.Lap)
                 return pB.Lap.CompareTo(pA.Lap); 
@@ -338,6 +339,10 @@ public class CheckPointsSystem : NetworkBehaviour
         });
 
         Debug.Log("📊 Cập nhật bảng xếp hạng: " + string.Join(", ", CurrentLeaderboard));
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            Debug.Log($"🟢 Client đang kết nối: {client.ClientId}");
+        }
     }
     
     [ClientRpc]
@@ -349,7 +354,7 @@ public class CheckPointsSystem : NetworkBehaviour
         if (localPlayer == null) return;
 
         var ui = localPlayer.GetComponentInChildren<LeaderBoardUI>();
-        if (ui != null)
+        if (ui != null) 
         {
             ui.UpdateLeaderboardUI(leaderboard);
         }
@@ -359,12 +364,12 @@ public class CheckPointsSystem : NetworkBehaviour
     {
         return _checkPointsList.IndexOf(checkPoint);
     }
-    
+
     public void RegisterRaceProgressUI(ulong clientId, RaceProgressUI ui)
     {
-        if (!_raceProgressUIMap.ContainsKey(clientId))
+        if (!_playerUIMap.ContainsKey(clientId))
         {
-            _raceProgressUIMap.Add(clientId, ui);
+            _playerUIMap.Add(clientId, ui);
             Debug.Log($"✅ Đã đăng ký UI cho Client {clientId}");
         }
     }

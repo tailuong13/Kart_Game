@@ -28,7 +28,9 @@ public class PowerUpRandom : NetworkBehaviour
 
     [Header("AudioClips")] 
     private AudioSource audioSource;
-    public AudioClip nitroSound;
+    [SerializeField] private AudioClip nitroSound;
+    [SerializeField] private AudioClip lightningSound;   // sound sấm sét cho target
+    [SerializeField] private AudioClip oilSound; 
     
     [Header("UI")]
     public GameObject arrowUI;
@@ -46,7 +48,9 @@ public class PowerUpRandom : NetworkBehaviour
 
     public bool isHoldingPowerUp = false;
     
-    public KartController kartController; 
+    public KartController kartController;
+    public CheckPointsSystem checkPointsSystem;
+    [SerializeField] private GameObject oilEffectUI;
 
     public override void OnNetworkSpawn()
     {
@@ -70,6 +74,11 @@ public class PowerUpRandom : NetworkBehaviour
 
         if (nitroPointRight == null)
             nitroPointRight = transform.Find("NitroPointRight");
+        
+        if (checkPointsSystem == null)
+            checkPointsSystem = FindObjectOfType<CheckPointsSystem>();
+        
+        Debug.Log("activeSelf: " + oilEffectUI.activeSelf);
     }
 
     private void Update()
@@ -105,7 +114,7 @@ public class PowerUpRandom : NetworkBehaviour
 
     public void RandomPowerUp()
     {
-        int randomIndex = 2; // Replace with Random.Range(0, powerUpSprites.Length) if needed
+        int randomIndex = 1; // Replace with Random.Range(0, powerUpSprites.Length) if needed
         powerUpImage.sprite = powerUpSprites[randomIndex];
 
         PowerUpType selected = (PowerUpType)randomIndex;
@@ -227,6 +236,20 @@ public class PowerUpRandom : NetworkBehaviour
             Debug.Log($"[AttachPowerUpClientRpc] Attached {(PowerUpType)powerUpType} with NetId={netId}");
         }
     }
+    
+    [ServerRpc]
+    private void DespawnHeldPowerUpServerRpc(ulong powerUpId)
+    {
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(powerUpId, out var obj))
+        {
+            obj.Despawn();
+            Debug.Log($"[DespawnHeldPowerUpServerRpc] Despawned object with NetId={powerUpId}");
+        }
+        else
+        {
+            Debug.LogWarning($"[DespawnHeldPowerUpServerRpc] ❌ NetId={powerUpId} not found");
+        }
+    }
 
     #region Banana - Effect
     public void TryDropBanana()
@@ -249,7 +272,6 @@ public class PowerUpRandom : NetworkBehaviour
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(bananaId, out var banana))
         {
             banana.ChangeOwnership(NetworkManager.ServerClientId);
-
             Vector3 pos = banana.transform.position + Vector3.up * 0.3f;
             Quaternion rot = Quaternion.Euler(-90f, script.holdPoint.rotation.eulerAngles.y, 0f);
 
@@ -400,17 +422,81 @@ public class PowerUpRandom : NetworkBehaviour
     }
     
     #endregion
-    
+
+    #region Lightning - Effect
+
     public void UseLightning()
     {
         if (currentPowerUp != PowerUpType.Lightning || heldPowerUp == null) return;
-        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
+
         heldPowerUp = null;
         currentPowerUp = PowerUpType.None;
+        isHoldingPowerUp = false;
+
+        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
+        TriggerLightningEffectOnOpponentsServerRpc(OwnerClientId);
+    }
+    
+    [ServerRpc]
+    private void TriggerLightningEffectOnOpponentsServerRpc(ulong userClientId)
+    {
+        checkPointsSystem.UpdateLeaderboard();
+
+        var leaderboard = checkPointsSystem.CurrentLeaderboard;
+        if (leaderboard.Count < 2)
+            return;
+
+        foreach (var clientId in leaderboard)
+        {
+            if (clientId == userClientId) continue;
+
+            if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
+            {
+                var playerObject = client.PlayerObject;
+                var handler = playerObject.GetComponent<PowerUpRandom>();
+
+                if (handler != null && handler.IsShieldActive())
+                {
+                    Debug.Log($"🛡️ {clientId} đang có Shield, bỏ qua hiệu ứng Lightning.");
+                    continue;
+                }
+            }
+
+            Debug.Log($"⚡ Lightning từ {userClientId} tác động lên {clientId}");
+            ShowLightningEffectClientRpc(clientId);
+        }
+        
         heldPowerUpId.Value = 0;
     }
+    
+    [ClientRpc]
+    private void ShowLightningEffectClientRpc(ulong targetClientId)
+    {
+        if (NetworkManager.Singleton.LocalClientId != targetClientId)
+            return;
 
-    #region Missile
+        Debug.Log("⚡ Dính sấm! Hiển thị hiệu ứng và làm chậm.");
+        StartCoroutine(ShowLightningEffectRoutine(targetClientId));
+    }
+
+    private IEnumerator ShowLightningEffectRoutine(ulong targetClientId)
+    {
+        if (audioSource != null && lightningSound != null)
+        {
+            audioSource.PlayOneShot(lightningSound);
+            Debug.Log("🔊 Hiệu ứng âm thanh Lightning đã phát");
+        }
+
+        kartController.SetSpeedModifierServerRpc(0.5f, targetClientId); // giảm tốc 50%
+        yield return new WaitForSeconds(1.5f);
+        kartController.SetSpeedModifierServerRpc(1f, targetClientId);   // phục hồi tốc độ
+
+        Debug.Log("⚡ Hiệu ứng Lightning kết thúc.");
+    }
+
+    #endregion
+
+    #region Missile - Effect
     
     // [ClientRpc]
     // private void EnableArrowUIClientRpc()
@@ -484,27 +570,79 @@ public class PowerUpRandom : NetworkBehaviour
     }
 
     #endregion
-
+    
+    #region Oil - Effect
     public void FireOilBullet()
     {
         if (currentPowerUp != PowerUpType.Oil || heldPowerUp == null) return;
-        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
+       
         heldPowerUp = null;
         currentPowerUp = PowerUpType.None;
+        isHoldingPowerUp = false;
+        
+        DespawnHeldPowerUpServerRpc(heldPowerUpId.Value);
+        TriggerOilEffectOnLeaderServerRpc(OwnerClientId);
+    }
+    
+    [ServerRpc]
+    private void TriggerOilEffectOnLeaderServerRpc(ulong userClientId)
+    {
+        checkPointsSystem.UpdateLeaderboard();
+
+        var leaderboard = checkPointsSystem.CurrentLeaderboard;
+        if (leaderboard.Count < 2)
+            return;
+
+        ulong targetClientId = leaderboard[0];
+        if (targetClientId == userClientId)
+            targetClientId = leaderboard[1];
+        
+        if (NetworkManager.Singleton.ConnectedClients.TryGetValue(targetClientId, out var client))
+        {
+            var playerObject = client.PlayerObject;
+            var handler = playerObject.GetComponent<PowerUpRandom>();
+
+            if (handler != null && handler.IsShieldActive())
+            {
+                Debug.Log($"🛡️ {targetClientId} đang có Shield, bỏ qua hiệu ứng Oil.");
+                return;
+            }
+        }
+
+        Debug.Log($"🛢️ Oil từ {userClientId} nhắm tới {targetClientId}");
         heldPowerUpId.Value = 0;
+        
+        ShowOilEffectClientRpc(targetClientId);
+    }
+    
+    [ClientRpc]
+    private void ShowOilEffectClientRpc(ulong targetClientId)
+    {
+        if (NetworkManager.Singleton.LocalClientId != targetClientId)
+            return;
+
+        Debug.Log("💥 Dính dầu! Hiển thị hiệu ứng trên HUD.");
+        StartCoroutine(ShowOilEffectRoutine());
     }
 
-    [ServerRpc]
-    private void DespawnHeldPowerUpServerRpc(ulong powerUpId)
+    private IEnumerator ShowOilEffectRoutine()
     {
-        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(powerUpId, out var obj))
+        if (audioSource != null && oilSound != null)
         {
-            obj.Despawn();
-            Debug.Log($"[DespawnHeldPowerUpServerRpc] Despawned object with NetId={powerUpId}");
+            audioSource.PlayOneShot(oilSound);
+            Debug.Log("🔊 Hiệu ứng âm thanh Oil đã phát");
         }
-        else
-        {
-            Debug.LogWarning($"[DespawnHeldPowerUpServerRpc] ❌ NetId={powerUpId} not found");
-        }
+        
+        oilEffectUI.transform.parent.gameObject.SetActive(true);
+        oilEffectUI.SetActive(true);
+        
+        yield return new WaitForSeconds(2f);
+
+        oilEffectUI.transform.parent.gameObject.SetActive(false);
+        oilEffectUI.SetActive(false);
     }
+    
+    #endregion 
+
+    
 }

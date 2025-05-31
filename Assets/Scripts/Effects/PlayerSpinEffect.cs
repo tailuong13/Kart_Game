@@ -23,7 +23,11 @@ public class PlayerSpinEffect : MonoBehaviour
         Debug.Log("✅ Bắt đầu Spin bằng Rigidbody");
         var kart = GetComponent<KartController>();
         if (kart != null)
+        {
             kart.isBeingSpin = true;
+            Debug.Log("Spin thành công");
+        }
+        
     }
 
     private void FixedUpdate()
@@ -40,6 +44,12 @@ public class PlayerSpinEffect : MonoBehaviour
         {
             isSpinning = false;
             Debug.Log("✅ Kết thúc Spin");
+            var kart = GetComponent<KartController>();
+            if (kart != null)
+            {
+                kart.isBeingSpin = false;
+                Debug.Log("Spin kết thúc, khôi phục trạng thái");
+            }
         }
     }
 }
