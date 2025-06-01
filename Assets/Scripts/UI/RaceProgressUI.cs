@@ -31,22 +31,28 @@ public class RaceProgressUI : NetworkBehaviour
     }
 
     private void Update()
-    {
-        if (!IsOwner || finished) return;
+    {   
+        if (!IsOwner) return;
 
-        currentLapTime += Time.deltaTime;
-        totalRaceTime += Time.deltaTime;
+        if (!finished)
+        {
+            currentLapTime += Time.deltaTime;
+            totalRaceTime += Time.deltaTime;
 
-        lapTimeText.text = $"Lap Time: {FormatTime(currentLapTime)}";
-        totalTimeText.text = $"Total: {FormatTime(totalRaceTime)}";
-
+            lapTimeText.text = $"Lap Time: {FormatTime(currentLapTime)}";
+            totalTimeText.text = $"Total: {FormatTime(totalRaceTime)}";
+        }
         UpdateCountdown();
     }
 
     // Cập nhật hiển thị countdown
     private void UpdateCountdown()
     {
-        if (CheckPointsSystem.Instance == null) return;
+        if (CheckPointsSystem.Instance == null)
+        {
+            Debug.LogWarning("CheckPointsSystem.Instance is null. Countdown cannot be updated.");
+            return;
+        }
 
         bool isActive = CheckPointsSystem.Instance.GetCountdownActive();
         float timeLeft = CheckPointsSystem.Instance.GetCountdownTime();
@@ -54,9 +60,11 @@ public class RaceProgressUI : NetworkBehaviour
         if (isActive && !countdownActive)
         {
             countdownActive = true;
-            countdownTime = timeLeft;
             if (countdownPanel != null)
+            {
                 countdownPanel.SetActive(true);
+                Debug.Log("Countdown started!");
+            }
         }
 
         if (countdownActive)
@@ -86,9 +94,9 @@ public class RaceProgressUI : NetworkBehaviour
     {
         if (!IsOwner) return;
         finished = true;
+        Debug.Log("[RaceProgressUI] 🏁 Đã hoàn thành cuộc đua!");
         FinalTime = totalRaceTime;
         Debug.Log($"🏁 Final Time của {OwnerClientId} là {FormatTime(FinalTime)}");
-        
         SubmitFinalTimeServerRpc(FinalTime);
     }
 

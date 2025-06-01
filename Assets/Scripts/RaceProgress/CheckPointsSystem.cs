@@ -50,25 +50,16 @@ public class CheckPointsSystem : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        if (raceFinished)
+        if (IsCountdownActive.Value)
         {
-            if (countdownTime > 0f)
-            {
-                countdownTime -= Time.deltaTime;
-                if (countdownTime < 0f) countdownTime = 0f;
-                
-                CountdownTimer.Value = countdownTime;
-                IsCountdownActive.Value = true;
-            }
-            else
+            CountdownTimer.Value -= Time.deltaTime;
+
+            if (CountdownTimer.Value <= 0f)
             {
                 IsCountdownActive.Value = false;
-                // TODO: Kết thúc race, gửi event hoặc xử lý tiếp
-                Debug.Log("Race kết thúc sau countdown");
+                CountdownTimer.Value = 0f;
             }
         }
-        
-        
     }
 
     public override void OnNetworkSpawn()
@@ -247,6 +238,8 @@ public class CheckPointsSystem : NetworkBehaviour
                     if (!raceFinished && _lapCount[clientId] >= maxLap)
                     {
                         raceFinished = true;
+                        IsCountdownActive.Value = true;
+                        CountdownTimer.Value = 10f;
                         if (_playerUIMap.TryGetValue(clientId, out RaceProgressUI ui))
                         {
                             ui.MarkFinishClientRpc();
