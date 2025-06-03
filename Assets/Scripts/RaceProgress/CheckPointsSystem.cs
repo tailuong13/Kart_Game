@@ -5,6 +5,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Serialization;
 using Unity.Netcode;
+using UnityEngine.SceneManagement;
 
 public class CheckPointsSystem : NetworkBehaviour 
 {
@@ -366,4 +367,35 @@ public class CheckPointsSystem : NetworkBehaviour
             Debug.Log($"✅ Đã đăng ký UI cho Client {clientId}");
         }
     }
+    
+    public void EndRaceAndLoadFinishScene()
+    {
+        var resultManager = RaceResultManager.Instance;
+        if (resultManager == null) return;
+
+        resultManager.ClearResults();
+
+        for (int i = 0; i < CurrentLeaderboard.Count; i++)
+        {
+            ulong clientId = CurrentLeaderboard[i];
+            var selection = CarSelectionManager.Instance.GetPlayerSelection(clientId);
+            var progress = _playerRaceProgress[clientId];
+
+           // string playerName = PlayerSession.Instance?.GetPlayerName(clientId) ?? $"Player {clientId}";
+
+            resultManager.Results.Add(new RaceResultManager.RaceResult
+            {
+               // PlayerName = playerName,
+                FinishTime = progress.TimeStamp,
+                CarId = selection.CarId,
+                Rank = i + 1
+            });
+        }
+
+        if (IsServer)
+        {
+            NetworkManager.Singleton.SceneManager.LoadScene("FinishScene", LoadSceneMode.Single);
+        }
+    }
+
 }

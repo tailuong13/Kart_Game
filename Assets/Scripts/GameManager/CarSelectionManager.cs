@@ -14,7 +14,17 @@ public class CarSelectionManager : NetworkBehaviour
     public static CarSelectionManager Instance;
     private Dictionary<ulong, PlayerSelection> playerSelections = new();
 
-    private void Awake() => Instance = this;
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(this.gameObject);
+    }
 
     public void PlayerSelected(ulong clientId, int carId, int characterId)
     {

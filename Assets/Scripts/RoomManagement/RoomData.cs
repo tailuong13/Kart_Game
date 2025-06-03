@@ -5,6 +5,9 @@ public class RoomData
 {
     public string RoomId;
     public ushort Port;
+    
+    public bool IsMatchmaking = false; 
+    public ulong? HostClientId;
     public List<ulong> Players = new List<ulong>();
     public Dictionary<ulong, bool> ReadyStates = new Dictionary<ulong, bool>();
     public int MaxPlayers = 2;
@@ -17,7 +20,10 @@ public class RoomData
     public void AddPlayer(ulong clientId)
     {
         if (!Players.Contains(clientId))
+        {
             Players.Add(clientId);
+            ReadyStates[clientId] = false; 
+        }
     }
 
     public void RemovePlayer(ulong clientId)

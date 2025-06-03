@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using UnityEngine;
 using Unity.Netcode;
@@ -8,11 +9,26 @@ using UnityEngine.SceneManagement;
 public class GameFlowManager : NetworkBehaviour
 {
     public static GameFlowManager Instance;
+
     public NetworkVariable<FixedString32Bytes> SelectedMap = new(
         default,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server
     );
+
+    public struct LobbyPlayerData
+    {
+        public ulong ClientId;
+        public FixedString32Bytes PlayerName;
+        public bool IsHost;
+        public bool IsReady;
+        public int CarId;
+        public int CharacterId;
+    }
+
+    private Dictionary<ulong, LobbyPlayerData> lobbyPlayers = new();
+
+    private ulong HostClientId;
 
     private void Awake()
     {
@@ -30,35 +46,248 @@ public class GameFlowManager : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         Debug.Log($"[OnNetworkSpawn] {(IsServer ? "Server" : "Client")} GameFlowManager loaded in scene {SceneManager.GetActiveScene().name}");
-        Debug.Log($"IsServer={NetworkManager.Singleton.IsServer}, IsClient={NetworkManager.Singleton.IsClient}, IsHost={NetworkManager.Singleton.IsHost}, LocalClientId={NetworkManager.Singleton.LocalClientId}");
-    }
-    
-    public void StartGame()
-    {
+        
         if (IsServer)
         {
-            if (string.IsNullOrEmpty(SelectedMap.Value.ToString()))
+            HostClientId = NetworkManager.Singleton.LocalClientId;
+
+            lobbyPlayers.Clear();
+
+            var hostData = new LobbyPlayerData
             {
-                Debug.LogError($"[Server] SelectedMap rỗng! Không thể load scene.");
+                ClientId = HostClientId,
+                PlayerName = new FixedString32Bytes("Host"),
+                IsHost = true,
+                IsReady = false,
+                CarId = 0,
+                CharacterId = 0
+            };
+
+            lobbyPlayers[HostClientId] = hostData;
+
+            SelectedMap.Value = new FixedString32Bytes("Map1Scene");
+
+            UpdateLobbyClientRpc(GetLobbyPlayerList().Select(p => new LobbyPlayerInfo
+            {
+                ClientId = p.ClientId,
+                PlayerName = p.PlayerName,
+                IsHost = p.IsHost,
+                IsReady = p.IsReady,
+                CarId = p.CarId,
+                CharacterId = p.CharacterId
+            }).ToArray());
+        }
+    }
+
+    #region Lobby Player Join / Leave (thêm/xóa)
+
+    public void AddPlayerToLobby(ulong clientId, string playerName)
+    {
+        if (!IsServer) return;
+
+        if (!lobbyPlayers.ContainsKey(clientId))
+        {
+            var data = new LobbyPlayerData
+            {
+                ClientId = clientId,
+                PlayerName = new FixedString32Bytes(playerName),
+                IsHost = false,
+                IsReady = false,
+                CarId = 0,
+                CharacterId = 0
+            };
+
+            lobbyPlayers[clientId] = data;
+            Debug.Log($"Player {clientId} ({playerName}) joined lobby.");
+
+            UpdateLobbyClientRpc(GetLobbyPlayerList().Select(p => new LobbyPlayerInfo
+            {
+                ClientId = p.ClientId,
+                PlayerName = p.PlayerName,
+                IsHost = p.IsHost,
+                IsReady = p.IsReady,
+                CarId = p.CarId,
+                CharacterId = p.CharacterId
+            }).ToArray());
+        }
+    }
+
+    public void RemovePlayerFromLobby(ulong clientId)
+    {
+        if (!IsServer) return;
+
+        if (lobbyPlayers.ContainsKey(clientId))
+        {
+            lobbyPlayers.Remove(clientId);
+            Debug.Log($"Player {clientId} left lobby.");
+
+            if (clientId == HostClientId)
+            {
+                if (lobbyPlayers.Count > 0)
+                {
+                    HostClientId = ulong.MaxValue;
+                    foreach (var kvp in lobbyPlayers)
+                    {
+                        if (kvp.Key < HostClientId)
+                            HostClientId = kvp.Key;
+                    }
+
+                    var hostData = lobbyPlayers[HostClientId];
+                    hostData.IsHost = true;
+                    lobbyPlayers[HostClientId] = hostData;
+
+                    Debug.Log($"New Host is {HostClientId}");
+                }
+                else
+                {
+                    Debug.Log("Lobby empty, no host.");
+                }
+            }
+
+            UpdateLobbyClientRpc(GetLobbyPlayerList().Select(p => new LobbyPlayerInfo
+            {
+                ClientId = p.ClientId,
+                PlayerName = p.PlayerName,
+                IsHost = p.IsHost,
+                IsReady = p.IsReady,
+                CarId = p.CarId,
+                CharacterId = p.CharacterId
+            }).ToArray());
+        }
+    }
+
+    #endregion
+
+    #region ServerRpc: Các hàm client gọi
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ToggleReady_ServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+
+        if (lobbyPlayers.ContainsKey(clientId))
+        {
+            var playerData = lobbyPlayers[clientId];
+            playerData.IsReady = !playerData.IsReady;
+            lobbyPlayers[clientId] = playerData;
+
+            Debug.Log($"Player {clientId} đã {(playerData.IsReady ? "Ready" : "Not Ready")}");
+
+            UpdateLobbyClientRpc(GetLobbyPlayerList().Select(p => new LobbyPlayerInfo
+            {
+                ClientId = p.ClientId,
+                PlayerName = p.PlayerName,
+                IsHost = p.IsHost,
+                IsReady = p.IsReady,
+                CarId = p.CarId,
+                CharacterId = p.CharacterId
+            }).ToArray());
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void UpdateSelection_ServerRpc(int carId, int characterId, ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+
+        if (lobbyPlayers.ContainsKey(clientId))
+        {
+            var playerData = lobbyPlayers[clientId];
+            playerData.CarId = carId;
+            playerData.CharacterId = characterId;
+            lobbyPlayers[clientId] = playerData;
+
+            Debug.Log($"Player {clientId} chọn xe {carId}, nhân vật {characterId}");
+
+            UpdateLobbyClientRpc(GetLobbyPlayerList().Select(p => new LobbyPlayerInfo
+            {
+                ClientId = p.ClientId,
+                PlayerName = p.PlayerName,
+                IsHost = p.IsHost,
+                IsReady = p.IsReady,
+                CarId = p.CarId,
+                CharacterId = p.CharacterId
+            }).ToArray());
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void StartGame_ServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+
+        if (clientId != HostClientId)
+        {
+            Debug.LogWarning("Chỉ Host mới được phép bắt đầu game!");
+            return;
+        }
+
+        foreach (var player in lobbyPlayers.Values)
+        {
+            if (!player.IsReady)
+            {
+                Debug.LogWarning("Không thể bắt đầu game khi còn người chơi chưa Ready.");
                 return;
             }
-            Debug.Log($"[Server] Đang load map: {SelectedMap.Value}");
-            StartCoroutine(LoadSceneWithDelay(SelectedMap.Value.ToString()));
         }
+
+        Debug.Log("Host bắt đầu game...");
+        StartGame();
+    }
+
+    #endregion
+
+    #region ClientRpc: gửi dữ liệu lobby cho client
+
+    [ClientRpc]
+    private void UpdateLobbyClientRpc(LobbyPlayerInfo[] players)
+    {
+        LobbyUIManager.Instance?.UpdatePlayerSlots(players);
+    }
+    #endregion
+
+    #region Helper
+
+    public LobbyPlayerData[] GetLobbyPlayerList()
+    {
+        var arr = new LobbyPlayerData[lobbyPlayers.Count];
+        lobbyPlayers.Values.CopyTo(arr, 0);
+        return arr;
+    }
+
+    public void StartGame()
+    {
+        if (!IsServer) return;
+
+        if (string.IsNullOrEmpty(SelectedMap.Value.ToString()))
+        {
+            Debug.LogError("[Server] SelectedMap rỗng! Không thể load scene.");
+            return;
+        }
+
+        Debug.Log($"[Server] Đang load map: {SelectedMap.Value}");
+
+        StartCoroutine(LoadSceneWithDelay(SelectedMap.Value.ToString()));
     }
 
     private IEnumerator LoadSceneWithDelay(string sceneName)
     {
         Debug.Log($"[Server] Chờ client sẵn sàng để load scene: {sceneName}");
+
         yield return new WaitUntil(() => NetworkManager.Singleton.ConnectedClients.Count == NetworkManager.Singleton.ConnectedClientsIds.Count);
+
         yield return new WaitForSeconds(1f);
+
         Debug.Log($"[Server] Connected clients: {NetworkManager.Singleton.ConnectedClients.Count}");
         foreach (var obj in FindObjectsOfType<NetworkObject>())
         {
             Debug.Log($"[Scene] NetworkObject {obj.name} | OwnerClientId: {obj.OwnerClientId} | IsSpawned: {obj.IsSpawned}");
         }
+
         NetworkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
     }
-    
-    
+
+    #endregion
 }
+
+

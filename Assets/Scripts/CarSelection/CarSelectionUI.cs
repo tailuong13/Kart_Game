@@ -71,7 +71,7 @@ public class CarSelectionUI : NetworkBehaviour
         if (hasSelected) return;
 
         hasSelected = true;
-        statusText.text = $"Đã chọn xe {currentCarIndex + 1} và nhân vật {currentCharIndex + 1}, đợi người khác...";
+        statusText.text = $"You have chosen {currentCarIndex + 1} and character {currentCharIndex + 1}, waiting for others ...";
 
         SubmitSelectionServerRpc(currentCarIndex, currentCharIndex);
     }

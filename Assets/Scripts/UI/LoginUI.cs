@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -9,19 +10,20 @@ using UnityEngine.UI;
 public class LoginUI : MonoBehaviour
 {
     public TMP_InputField usernameInput;
-
+    
     public void OnSubmit()
     {
         string username = usernameInput.text.Trim();
         if (!string.IsNullOrEmpty(username))
         {
             PlayerSession.Instance.SetPlayerName(username);
-            LoadMultiplayerScene();
+           // PlayerNameManager.Instance.RegisterLocalPlayerName(username);
+            LoadMainMenuScene();
         }
     }
 
-    private void LoadMultiplayerScene()
+    private void LoadMainMenuScene()
     {
-        SceneManager.LoadScene("MultiplayerScene", LoadSceneMode.Single);
+        SceneManager.LoadScene("MainMenu", LoadSceneMode.Single);
     }
 }

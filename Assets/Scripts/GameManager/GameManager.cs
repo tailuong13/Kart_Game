@@ -143,6 +143,14 @@ public class GameManager : NetworkBehaviour
         if (ui != null)
         {
             ui.StartCountdown();
+            foreach (var car in FindObjectsOfType<KartController>())
+            {
+                if (car.IsOwner)
+                {
+                    Debug.Log($"[Client] Không cho phép xe {car.name} chạy");
+                    car.canMove = false;
+                }
+            }
         }
 
         if (ui == null)
@@ -159,7 +167,7 @@ public class GameManager : NetworkBehaviour
             if (car.IsOwner)
             {
                 Debug.Log($"[Client] Cho phép xe {car.name} chạy");
-                // car.canMove = true;
+                car.canMove = true;
             }
         }
     }
