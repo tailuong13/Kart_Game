@@ -161,13 +161,12 @@
                 MaxPlayers = 2,
                 IsMatchmaking = isMatchmaking
             };
-            
-            if (!isMatchmaking)
-                room.HostClientId = clientId;
 
+            room.HostClientId = clientId;
             room.AddPlayer(clientId);
             rooms.Add(room);
-            Debug.Log($"Client {clientId} tạo phòng {room.RoomId}");
+            GameFlowManager.Instance.HostClientId = clientId;
+            Debug.Log($"Client {clientId} tạo phòng {room.RoomId}, {room.RoomId} có host là {room.HostClientId}");
             
             PlayerJoinedRoom(room.RoomId, clientId);
 
@@ -376,13 +375,11 @@
             if (room != null)
             {
                 room.AddPlayer(clientId);
-        
-                string playerName = PlayerSession.Instance?.GetPlayerName() ?? $"Player {clientId}";
-
+                
                 var infos = room.Players.Select(cid => new LobbyPlayerInfo
                 {
                     ClientId = cid,
-                    PlayerName = playerName, 
+                    PlayerName = PlayerNameManager.Instance.GetPlayerName(cid),
                     IsHost = cid == room.HostClientId,
                     IsReady = room.ReadyStates[cid],
                     CarId = 0,
@@ -390,6 +387,7 @@
                 }).ToArray();
 
                 SendLobbyInfosToClients(infos, room.Players);
+                Debug.Log($"AddPlayer: clientId = {clientId}, isHost = {clientId == room.HostClientId}");
                 Debug.Log("[RoomManager] Gửi thông tin lobby đến tất cả người chơi trong phòng " + roomId);
             }
         }
@@ -419,6 +417,6 @@
 
             Debug.Log($"[LobbyUIManager] Received {infos.Length} player(s) to update");
 
-            lobbyUIManager.UpdatePlayerSlots(infos); // <--- dòng gây lỗi nếu lobbyUIManager null
+            lobbyUIManager.UpdatePlayerSlots(infos); 
         }
     }

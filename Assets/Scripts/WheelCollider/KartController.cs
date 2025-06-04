@@ -76,11 +76,12 @@ public class KartController : NetworkBehaviour
         {
             raceProgressUI = GetComponentInChildren<RaceProgressUI>(true);
         }
-        
     }
 
     public override void OnNetworkSpawn()
     {
+        Debug.Log($"[KartController] On NetworkSpawn canMove = {canMove}");
+        
         StartCoroutine(SetupRigidbody());
         
         Debug.Log($"OnNetworkSpawn: Owner = {IsOwner}, Rigidbody isKinematic = {rb.isKinematic}");
@@ -135,15 +136,17 @@ public class KartController : NetworkBehaviour
 
     private void FixedUpdate()
     {
+        Debug.Log($"[KartController] canMove = {canMove}");
+        
         if (isBeingSpin) return;
-
-        if (!canMove)
-        {
-            return;
-        }
         
         if (IsOwner)
         {
+            if (!canMove)
+            {
+                return;
+            }
+            
             HandleInput();
             UpdateWheelPositions();
         }

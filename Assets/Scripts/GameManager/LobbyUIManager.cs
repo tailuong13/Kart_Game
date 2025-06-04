@@ -76,9 +76,9 @@ public class LobbyUIManager : MonoBehaviour
             if (i < players.Length)
             {
                 Debug.Log($"Setting slot {i} to {players[i].PlayerName}");
-                playerSlots[i].SetActive(true);
                 bool isLocal = players[i].ClientId == NetworkManager.Singleton.LocalClientId;
                 bool isHost = players[i].IsHost;
+                playerSlots[i].SetActive(true);
                 playerSlots[i].Initialize(players[i], isLocal, isHost);
             }
             else

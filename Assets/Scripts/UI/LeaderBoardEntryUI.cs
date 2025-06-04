@@ -1,4 +1,5 @@
 using TMPro;
+using Unity.Collections;
 using UnityEngine;
 
 public class LeaderBoardEntryUI : MonoBehaviour
@@ -7,10 +8,10 @@ public class LeaderBoardEntryUI : MonoBehaviour
     public TextMeshProUGUI PlayerNameText;
     public TextMeshProUGUI LapText;
 
-    public void SetEntry(int position, ulong playerId, int lap)
+    public void SetEntry(int position, FixedString32Bytes playerName, int lap)
     {
         PositionText.text = $"#{position}";
-        PlayerNameText.text = $"Player {playerId}";
-        LapText.text = $"Lap {lap}";
+        PlayerNameText.text = $"{playerName}";
+        LapText.text = $"{lap}";
     }
 }

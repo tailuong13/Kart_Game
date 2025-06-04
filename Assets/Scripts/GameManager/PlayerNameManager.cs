@@ -20,13 +20,15 @@ public class PlayerNameManager : NetworkBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject); 
     }
-
+    
     public void RegisterLocalPlayerName(string playerName)
     {
         if (string.IsNullOrWhiteSpace(playerName))
         {
             playerName = $"Player_{NetworkManager.Singleton.LocalClientId}";
         }
+        
+        Debug.Log("Registering player name: " + playerName);
 
         SubmitNameServerRpc(playerName);
     }

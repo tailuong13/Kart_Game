@@ -10,6 +10,14 @@ public class ClientConnectManager : MonoBehaviour
         NetworkManager.Singleton.OnClientConnectedCallback += (clientId) =>
         {
             Debug.Log($"Đã kết nối với server, client ID: {clientId}");
+            if (NetworkManager.Singleton.LocalClientId == clientId)
+            {
+                if (PlayerSession.Instance != null && PlayerNameManager.Instance != null)
+                {
+                    PlayerNameManager.Instance.RegisterLocalPlayerName(PlayerSession.Instance.PlayerName);
+                }
+
+            }
             onConnected?.Invoke();
         };
         

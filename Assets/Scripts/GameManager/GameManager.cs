@@ -168,6 +168,13 @@ public class GameManager : NetworkBehaviour
             {
                 Debug.Log($"[Client] Cho phép xe {car.name} chạy");
                 car.canMove = true;
+                Debug.Log("Xe khi được cho phép: " + car.canMove);
+                
+                RaceProgressUI raceUI = car.GetComponentInChildren<RaceProgressUI>(true);
+                if (raceUI != null)
+                {
+                    raceUI.StartRace();
+                }
             }
         }
     }
@@ -202,6 +209,7 @@ public class GameManager : NetworkBehaviour
         Debug.Log($"[Server] Player {clientId} đã ngắt kết nối!");
         connectedClients.Remove(clientId);
         clientCarChoice.Remove(clientId);
+        clientCharacterChoice.Remove(clientId);
     }
 
     private void OnPlayerConnected(ulong clientId)

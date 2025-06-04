@@ -18,6 +18,8 @@ public class RaceProgressUI : NetworkBehaviour
 
     private bool countdownActive = false;
     private float countdownTime = 0f;
+    
+    public bool raceStarted = false;
 
     public static float FinalTime { get; private set; } 
 
@@ -34,7 +36,7 @@ public class RaceProgressUI : NetworkBehaviour
     {   
         if (!IsOwner) return;
 
-        if (!finished)
+        if (!finished && raceStarted)
         {
             currentLapTime += Time.deltaTime;
             totalRaceTime += Time.deltaTime;
@@ -43,6 +45,12 @@ public class RaceProgressUI : NetworkBehaviour
             totalTimeText.text = $"Total: {FormatTime(totalRaceTime)}";
         }
         UpdateCountdown();
+    }
+    
+    public void StartRace()
+    {
+        raceStarted = true;
+        Debug.Log("🚦 Cuộc đua bắt đầu! Bắt đầu tính giờ.");
     }
 
     // Cập nhật hiển thị countdown

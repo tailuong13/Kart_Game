@@ -17,7 +17,6 @@ public class LoginUI : MonoBehaviour
         if (!string.IsNullOrEmpty(username))
         {
             PlayerSession.Instance.SetPlayerName(username);
-           // PlayerNameManager.Instance.RegisterLocalPlayerName(username);
             LoadMainMenuScene();
         }
     }

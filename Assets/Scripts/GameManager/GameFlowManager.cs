@@ -28,7 +28,7 @@ public class GameFlowManager : NetworkBehaviour
 
     private Dictionary<ulong, LobbyPlayerData> lobbyPlayers = new();
 
-    private ulong HostClientId;
+    public ulong HostClientId;
 
     private void Awake()
     {
@@ -76,35 +76,42 @@ public class GameFlowManager : NetworkBehaviour
                 CarId = p.CarId,
                 CharacterId = p.CharacterId
             }).ToArray());
+            
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         }
     }
-
-    #region Lobby Player Join / Leave (thêm/xóa)
-
-    public void AddPlayerToLobby(ulong clientId, string playerName)
+    
+    private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
 
+        Debug.Log($"[OnClientConnected] Client {clientId} joined lobby");
+        
+        if (clientId == NetworkManager.ServerClientId)
+        {
+            Debug.Log("[OnClientConnected] Server connected, không thêm vào lobbyPlayers.");
+            return;
+        }
+        
+        bool isFirstPlayer = lobbyPlayers.Count == 0;
+
         if (!lobbyPlayers.ContainsKey(clientId))
         {
-            var data = new LobbyPlayerData
+            lobbyPlayers[clientId] = new LobbyPlayerData
             {
                 ClientId = clientId,
-                PlayerName = new FixedString32Bytes(playerName),
+                PlayerName = new FixedString32Bytes($"Player{clientId}"),
                 IsHost = false,
                 IsReady = false,
                 CarId = 0,
                 CharacterId = 0
             };
 
-            lobbyPlayers[clientId] = data;
-            Debug.Log($"Player {clientId} ({playerName}) joined lobby.");
-
             UpdateLobbyClientRpc(GetLobbyPlayerList().Select(p => new LobbyPlayerInfo
             {
                 ClientId = p.ClientId,
                 PlayerName = p.PlayerName,
-                IsHost = p.IsHost,
+                IsHost = isFirstPlayer,
                 IsReady = p.IsReady,
                 CarId = p.CarId,
                 CharacterId = p.CharacterId
@@ -112,6 +119,9 @@ public class GameFlowManager : NetworkBehaviour
         }
     }
 
+    #region Lobby Player Join / Leave (thêm/xóa)
+
+    
     public void RemovePlayerFromLobby(ulong clientId)
     {
         if (!IsServer) return;
@@ -163,7 +173,9 @@ public class GameFlowManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void ToggleReady_ServerRpc(ServerRpcParams rpcParams = default)
     {
+        Debug.Log("CLient gửi ToggleReady_ServerRpc");
         ulong clientId = rpcParams.Receive.SenderClientId;
+        Debug.Log("HostClientId: " + HostClientId);
 
         if (lobbyPlayers.ContainsKey(clientId))
         {
@@ -177,7 +189,7 @@ public class GameFlowManager : NetworkBehaviour
             {
                 ClientId = p.ClientId,
                 PlayerName = p.PlayerName,
-                IsHost = p.IsHost,
+                IsHost = (p.ClientId == HostClientId),
                 IsReady = p.IsReady,
                 CarId = p.CarId,
                 CharacterId = p.CharacterId
@@ -214,22 +226,43 @@ public class GameFlowManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void StartGame_ServerRpc(ServerRpcParams rpcParams = default)
     {
+        Debug.Log("CLient gửi StartGame_ServerRpc");
+        
         ulong clientId = rpcParams.Receive.SenderClientId;
+        Debug.Log("ClientId: " + clientId);
 
         if (clientId != HostClientId)
         {
             Debug.LogWarning("Chỉ Host mới được phép bắt đầu game!");
             return;
         }
+        
 
         foreach (var player in lobbyPlayers.Values)
         {
+            Debug.Log($"[Check Ready] PlayerName: {player.PlayerName}, ClientId: {player.ClientId}, IsReady: {player.IsReady}");
+
+            if (player.ClientId == 0)
+            {
+                Debug.Log("Host ảo, continue");
+                continue;
+            }
+            
+            if (player.ClientId == HostClientId)
+            {
+                Debug.Log($"[Check Ready] Bỏ qua Host: {player.PlayerName} (ClientId: {player.ClientId})");
+                continue;
+            }
+
             if (!player.IsReady)
             {
+                Debug.LogWarning($"❌ Player chưa Ready: {player.PlayerName} (ClientId: {player.ClientId})");
                 Debug.LogWarning("Không thể bắt đầu game khi còn người chơi chưa Ready.");
                 return;
             }
         }
+
+        Debug.Log("✅ Tất cả người chơi (trừ Host) đã Ready. Bắt đầu game...");
 
         Debug.Log("Host bắt đầu game...");
         StartGame();
@@ -242,6 +275,11 @@ public class GameFlowManager : NetworkBehaviour
     [ClientRpc]
     private void UpdateLobbyClientRpc(LobbyPlayerInfo[] players)
     {
+        Debug.Log($"Players count: {players.Length}");
+        for (int i = 0; i < players.Length; i++)
+        {
+            Debug.Log($"Player {i}: {players[i].PlayerName} (ClientId: {players[i].ClientId})");
+        }
         LobbyUIManager.Instance?.UpdatePlayerSlots(players);
     }
     #endregion
@@ -250,9 +288,9 @@ public class GameFlowManager : NetworkBehaviour
 
     public LobbyPlayerData[] GetLobbyPlayerList()
     {
-        var arr = new LobbyPlayerData[lobbyPlayers.Count];
-        lobbyPlayers.Values.CopyTo(arr, 0);
-        return arr;
+        return lobbyPlayers.Values
+            .Where(p => p.ClientId != NetworkManager.ServerClientId)
+            .ToArray();
     }
 
     public void StartGame()

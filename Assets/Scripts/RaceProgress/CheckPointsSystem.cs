@@ -25,6 +25,8 @@ public class CheckPointsSystem : NetworkBehaviour
     
     private NetworkVariable<float> CountdownTimer = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private NetworkVariable<bool> IsCountdownActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    public PlayerNameManager playerNameManager;
     
     public int maxLap = 1;
     
@@ -34,11 +36,13 @@ public class CheckPointsSystem : NetworkBehaviour
     {
         public ulong PlayerId;
         public int Lap;
-
+        public FixedString32Bytes PlayerName;
+        
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref PlayerId);
             serializer.SerializeValue(ref Lap);
+            serializer.SerializeValue(ref PlayerName);
         }
     }
     
@@ -90,6 +94,9 @@ public class CheckPointsSystem : NetworkBehaviour
 
             //RequestCarListServerRpc(); (nếu cần tự gọi sau khi spawn)
         }
+        
+        if (playerNameManager == null) 
+            playerNameManager = FindObjectOfType<PlayerNameManager>();
     }
     
     public void AddPlayerToCheckpointSystem(NetworkObject car)
@@ -106,19 +113,24 @@ public class CheckPointsSystem : NetworkBehaviour
             _lapCount[clientId] = 0; // Sử dụng ClientId
             _previousCheckpointIndexList.Add(-1);
             
+            var playerName = playerNameManager.GetPlayerName(clientId);
+            Debug.Log($"[CheckPointsSystem] PlayerName for {clientId} = {playerName}");
+            
             _playerRaceProgress[clientId] = new PlayerRaceProgress
             {
                 Lap = 0,
                 CheckpointIndex = 0,
-                TimeStamp = Time.time
+                TimeStamp = Time.time,
+                PlayerName = PlayerNameManager.Instance?.GetPlayerName(clientId) ?? $"Player_{clientId}",
             };
             
             Debug.Log($"📝 Đăng ký tiến trình cho Client {clientId}");
-
+            
+            
             Debug.Log("📡 Gửi danh sách xe cho tất cả client sau khi thêm!");
             SyncCarListClientRpc(carNetworkObjects.ToArray());
             UpdateLeaderboard();
-            FixedList64Bytes<LeaderboardEntry> lbList = new FixedList64Bytes<LeaderboardEntry>();
+            FixedList512Bytes<LeaderboardEntry> lbList = new FixedList512Bytes<LeaderboardEntry>();
             foreach (var id in CurrentLeaderboard)
             {
                 if (_playerRaceProgress.TryGetValue(id, out var progress))
@@ -126,12 +138,13 @@ public class CheckPointsSystem : NetworkBehaviour
                     lbList.Add(new LeaderboardEntry
                     {
                         PlayerId = id,
-                        Lap = progress.Lap
+                        Lap = progress.Lap,
+                        PlayerName = progress.PlayerName
                     });
                 }
             }
 
-            UpdateLeaderboardUIClientRpc(new ForceNetworkSerializeByMemcpy<FixedList64Bytes<LeaderboardEntry>>(lbList));
+            UpdateLeaderboardUIClientRpc(new ForceNetworkSerializeByMemcpy<FixedList512Bytes<LeaderboardEntry>>(lbList));
         }
     }
     
@@ -262,7 +275,7 @@ public class CheckPointsSystem : NetworkBehaviour
             _playerRaceProgress[clientId].CheckpointIndex = currentIndex;
             _playerRaceProgress[clientId].TimeStamp = Time.time;
             UpdateLeaderboard();
-            FixedList64Bytes<LeaderboardEntry> lbList = new FixedList64Bytes<LeaderboardEntry>();
+            FixedList512Bytes<LeaderboardEntry> lbList = new FixedList512Bytes<LeaderboardEntry>();
             foreach (var playerId in CurrentLeaderboard)
             {
                 if (_playerRaceProgress.TryGetValue(playerId, out var progress))
@@ -270,12 +283,13 @@ public class CheckPointsSystem : NetworkBehaviour
                     lbList.Add(new LeaderboardEntry
                     {
                         PlayerId = playerId,
-                        Lap = progress.Lap
+                        Lap = progress.Lap,
+                        PlayerName = progress.PlayerName
                     });
                 }
             }
 
-            UpdateLeaderboardUIClientRpc(new ForceNetworkSerializeByMemcpy<FixedList64Bytes<LeaderboardEntry>>(lbList));
+            UpdateLeaderboardUIClientRpc(new ForceNetworkSerializeByMemcpy<FixedList512Bytes<LeaderboardEntry>>(lbList));
             
             _previousCheckpointIndexList[carIndex] = currentIndex;
             _nextCheckPointIndexList[carIndex] = (expectedIndex + 1) % _checkPointsList.Count;
@@ -340,7 +354,7 @@ public class CheckPointsSystem : NetworkBehaviour
     }
     
     [ClientRpc]
-    private void UpdateLeaderboardUIClientRpc(ForceNetworkSerializeByMemcpy<FixedList64Bytes<LeaderboardEntry>> leaderboardWrapped)
+    private void UpdateLeaderboardUIClientRpc(ForceNetworkSerializeByMemcpy<FixedList512Bytes<LeaderboardEntry>> leaderboardWrapped)
     {
         var leaderboard = leaderboardWrapped.Value;
 
@@ -381,11 +395,11 @@ public class CheckPointsSystem : NetworkBehaviour
             var selection = CarSelectionManager.Instance.GetPlayerSelection(clientId);
             var progress = _playerRaceProgress[clientId];
 
-           // string playerName = PlayerSession.Instance?.GetPlayerName(clientId) ?? $"Player {clientId}";
+           string playerName = PlayerNameManager.Instance?.GetPlayerName(clientId) ?? $"Player_{clientId}";
 
             resultManager.Results.Add(new RaceResultManager.RaceResult
             {
-               // PlayerName = playerName,
+               PlayerName = playerName,
                 FinishTime = progress.TimeStamp,
                 CarId = selection.CarId,
                 Rank = i + 1

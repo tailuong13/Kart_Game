@@ -17,7 +17,7 @@ public class LeaderBoardUI : NetworkBehaviour
         InvokeRepeating(nameof(UpdateLeaderboardUI), 1f, 0.5f); 
     }
 
-    public void UpdateLeaderboardUI(FixedList64Bytes<CheckPointsSystem.LeaderboardEntry> leaderboard)
+    public void UpdateLeaderboardUI(FixedList512Bytes<CheckPointsSystem.LeaderboardEntry> leaderboard)
     {
         foreach (Transform child in entryContainer)
             Destroy(child.gameObject);
@@ -26,7 +26,7 @@ public class LeaderBoardUI : NetworkBehaviour
         {
             var entryData = leaderboard[i];
             GameObject entry = Instantiate(entryPrefab, entryContainer);
-            entry.GetComponent<LeaderBoardEntryUI>().SetEntry(i + 1, entryData.PlayerId, entryData.Lap);
+            entry.GetComponent<LeaderBoardEntryUI>().SetEntry(i + 1, entryData.PlayerName, entryData.Lap);
 
             if (!playerEntries.ContainsKey(entryData.PlayerId))
                 playerEntries.Add(entryData.PlayerId, entry);

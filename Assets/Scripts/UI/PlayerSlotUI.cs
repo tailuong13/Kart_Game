@@ -20,9 +20,13 @@ public class PlayerSlotUI : MonoBehaviour
 
     public void Initialize(LobbyPlayerInfo playerInfo, bool isLocal, bool isLocalHost)
     {
+        Debug.Log($"Initialize slot for ClientId {playerInfo.ClientId}, PlayerName: {playerInfo.PlayerName}, isLocal: " + isLocal + ", isLocalHost: " + isLocalHost + ", IsHost: " + playerInfo.IsHost + ", IsReady: " + playerInfo.IsReady);
+        
         clientId = playerInfo.ClientId;
         playerNameText.text = playerInfo.PlayerName.ToString();
         hostIcon.SetActive(playerInfo.IsHost);
+        
+        actionButton.gameObject.SetActive(true);
 
         isLocalPlayer = isLocal;
         isLocalPlayerHost = isLocalHost;
@@ -30,30 +34,32 @@ public class PlayerSlotUI : MonoBehaviour
 
         UpdateStatusText();
 
-        if (isLocalPlayerHost && playerInfo.IsHost)
+        // 1. Local Host
+        if (isLocalPlayer && playerInfo.IsHost)
         {
+            actionButton.gameObject.SetActive(true);
             actionButton.GetComponentInChildren<TextMeshProUGUI>().text = "Start";
             actionButton.onClick.RemoveAllListeners();
             actionButton.onClick.AddListener(() =>
             {
+                Debug.Log("🟢 StartButton clicked!");
                 GameFlowManager.Instance.StartGame_ServerRpc();
             });
 
-            statusText.text = ""; 
+            statusText.text = "H";
         }
-        else if (IsLocalClient(playerInfo.ClientId))
+        // ----------------------------
+        // 2. Local client thường
+        else if (isLocalPlayer)
         {
+            actionButton.gameObject.SetActive(true);
             actionButton.GetComponentInChildren<TextMeshProUGUI>().text = isReady ? "N-Ready" : "Ready";
             actionButton.onClick.RemoveAllListeners();
             actionButton.onClick.AddListener(() =>
             {
+                Debug.Log("🟢 ReadyButton clicked!");
                 GameFlowManager.Instance.ToggleReady_ServerRpc();
             });
-            UpdateStatusText();
-        }
-        else
-        {
-            actionButton.gameObject.SetActive(false);
             UpdateStatusText();
         }
 
@@ -79,7 +85,6 @@ public class PlayerSlotUI : MonoBehaviour
         {
             statusText.text = isReady ? "R" : "NR";
         }
-        statusText.text = isReady ? "R" : "NR";
     }
 
     public void  UpdateSlot(LobbyPlayerInfo playerInfo)
